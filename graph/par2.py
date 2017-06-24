@@ -328,7 +328,7 @@ def main_async(delka, profile, max_time = None):
                         vysledky_ok[ix] = (po, pr)    
                         
     print('vysledky_ok', len(vysledky_ok), vysledky_ok)
-    for (po, pr) in vysledky_ok:
+    for (po, pr) in vysledky_ok.values():
         print(len(po))
 
     elapsed_time = time.time() - start_time
