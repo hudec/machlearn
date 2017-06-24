@@ -312,10 +312,10 @@ def main_async(delka, profile, max_time = None):
             _vysledky2 = []
             l = 0
             while l + MAX_TASKS <= lvn:
-                print('zpracovavam', l, l + MAX_TASKS)
+                print('zpracovavam', l, l + MAX_TASKS, time.time() - start_time)
                 _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:l + MAX_TASKS]))
                 l += MAX_TASKS
-            print('zpracovavam', l, lvn)
+            print('zpracovavam', l, lvn, time.time() - start_time)
             _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:lvn]))
             print('_vysledky2', len(_vysledky2))
             
