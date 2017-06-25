@@ -1,7 +1,6 @@
 import ipyparallel as ipp
 #from timeit import default_timer as clock
-import sys, time
-import signal
+import sys, time, argparse, signal
 from contextlib import contextmanager
 
 class TimeoutException(Exception): pass
@@ -62,7 +61,11 @@ def clear_prof_data():
     PROF_DATA = {}
 
 ABCD = [0, 1, 3, 4]
+
 # PREDPIS = {0 : [0, 3], 1 : [4, 3], 3 : [1], 4: [0, 1]}
+# print(vytvor_posloupnost(5, PREDPIS))
+# posloupnost_12 = vytvor_posloupnost(12, PREDPIS)
+# print(12, PREDPIS, existuje_3_mocnina(posloupnost_12))
 
 # danou posloupnost prodlouzi o jednu iteraci - kazde cislo posle na svuj obraz
 def iteruj_posloupnost(posloupnost, predpis):
@@ -72,7 +75,7 @@ def iteruj_posloupnost(posloupnost, predpis):
     return novy
 
 # pro zadane pocatecni cislo a pocet iteraci vytvori posloupnost
-def vytvor_posloupnost(pocet, predpis):
+def vytvor_posloupnost(predpis, pocet_iteraci):
     posloupnost = None
     for k in predpis.keys():
         if k == predpis[k][0]:
@@ -80,11 +83,9 @@ def vytvor_posloupnost(pocet, predpis):
             break
     if posloupnost == None:
         raise ValueError('predpis nema zacatek', predpis)
-    for _ in range(pocet):
+    for _ in range(pocet_iteraci):
         posloupnost = iteruj_posloupnost(posloupnost, predpis)
     return posloupnost
-
-# print(vytvor_posloupnost(5, PREDPIS))
 
 # secte dany usek posloupnosti
 def secti_usek(posloupnost, c1, c2):
@@ -111,9 +112,6 @@ def existuje_3_mocnina(posloupnost):
             return True
     return False
 
-# posloupnost_12 = vytvor_posloupnost(12, PREDPIS)
-# print(12, PREDPIS, existuje_3_mocnina(posloupnost_12))
-
 def porovnej_obrazy(o1, o2):
     if o1[0] == o2[0] and o1[1] == o2[1]:
         return True
@@ -128,7 +126,7 @@ L0123 = [0, 1, 2, 3]
 # ix[2] je index predpisu 1 : 2
 # ix[3] je index predpisu 1 : 2
 # ix obsahuje ruzne hodnoty z mnoziny [0, 1, 2, 3]
-def generuj_predpisy(abcd, ix):
+def generuj_predpisy(abcd, mapa):
     if len(abcd) != 4:
         raise ValueError('abeceda nema delku 4', abcd)
     predpisy = []
@@ -138,35 +136,35 @@ def generuj_predpisy(abcd, ix):
                 for l in L0123:
                     if k == l:
                         continue
-                    obraz0 = [abcd[ix[0]], abcd[ix[i]]]
-                    obraz1 = [abcd[ix[j]]]
-                    obraz2 = [abcd[ix[k]], abcd[ix[l]]]
+                    obraz0 = [abcd[mapa[0]], abcd[mapa[i]]]
+                    obraz1 = [abcd[mapa[j]]]
+                    obraz2 = [abcd[mapa[k]], abcd[mapa[l]]]
                     if porovnej_obrazy(obraz0, obraz2):
                         continue
                     for m in L0123:
                         for n in L0123:
                             if m == n:
                                 continue
-                            obraz3 = [abcd[ix[m]], abcd[ix[n]]]
+                            obraz3 = [abcd[mapa[m]], abcd[mapa[n]]]
                             if porovnej_obrazy(obraz0, obraz3):
                                 continue
                             if porovnej_obrazy(obraz2, obraz3):
                                 continue
-                            predpisy.append({abcd[ix[0]] : obraz0, abcd[ix[1]] : obraz1, abcd[ix[2]] : obraz2, abcd[ix[3]] : obraz3})
+                            predpisy.append({abcd[mapa[0]] : obraz0, abcd[mapa[1]] : obraz1, abcd[mapa[2]] : obraz2, abcd[mapa[3]] : obraz3})
     return predpisy
 
-def najdi_bez_3_mocniny(predpis, delka):
-    posloupnost = vytvor_posloupnost(delka, predpis)
+def najdi_bez_3_mocniny(predpis, pocet_iteraci):
+    posloupnost = vytvor_posloupnost(predpis, pocet_iteraci)
     if existuje_3_mocnina(posloupnost):
         return None, None
     return posloupnost, predpis
 
-def najdi_bez_3_mocniny_sync(predpis, delka, max_time = None):
+def najdi_bez_3_mocniny_sync(predpis, pocet_iteraci, max_time = None):
     if max_time == None:
-        return najdi_bez_3_mocniny(predpis, delka)
+        return najdi_bez_3_mocniny(predpis, pocet_iteraci)
     
     try:
-        posloupnost = vytvor_posloupnost(delka, predpis)
+        posloupnost = vytvor_posloupnost(predpis, pocet_iteraci)
         with time_limit(max_time):
             if existuje_3_mocnina(posloupnost):
                 return None, None
@@ -175,15 +173,14 @@ def najdi_bez_3_mocniny_sync(predpis, delka, max_time = None):
         return posloupnost, None
     return posloupnost, predpis
 
-def main_sync(delka, max_time = None):
+def main_sync(cfg):
     start_time = time.time()
 
-    mapa = [0, 2, 1, 3]
-    print('abeceda', ABCD, 'mapa', mapa)
-    predpisy = generuj_predpisy(ABCD, mapa)
+    print('abeceda', ABCD, 'mapa', cfg.mapa)
+    predpisy = generuj_predpisy(ABCD, cfg.mapa)
     print('pocet predpisu', len(predpisy))
 
-    _vysledky = [najdi_bez_3_mocniny_sync(predpis, delka, max_time) for predpis in predpisy]
+    _vysledky = [najdi_bez_3_mocniny_sync(predpis, cfg.pocet_iteraci, cfg.max_doba_1_zpracovani) for predpis in predpisy]
     vysledky = [(po, pr) for (po, pr) in _vysledky if po != None]
     print('vysledky', len(vysledky))
     vysledky_ok = [(po, pr) for (po, pr) in vysledky if pr != None]
@@ -193,9 +190,6 @@ def main_sync(delka, max_time = None):
     print('Doba zpracovani (s)', elapsed_time)
 
 #     print_prof_data()
-
-DELKA = 10
-MAX_TIME = None
 
 # zkontroluje, zda se v posloupnosti vyskytuji treti aditivni mocniny dane delky
 def existuje_3_mocnina_pro_delku_async(posloupnost, delka, start_time):
@@ -230,10 +224,10 @@ def najdi_bez_3_mocniny_async(predpis):
     import time
 
     if MAX_TIME == None:
-        return najdi_bez_3_mocniny(predpis, delka)
+        return najdi_bez_3_mocniny(predpis, POCET_ITERACI)
 
     start_time = time.time()
-    posloupnost = vytvor_posloupnost(DELKA, predpis)
+    posloupnost = vytvor_posloupnost(predpis, POCET_ITERACI)
     if time.time() - start_time >= MAX_TIME:
         return posloupnost, None
         
@@ -255,13 +249,14 @@ def existuje_3_mocnina_pro_delku_async2(in_po_pr_de):
             return index, posloupnost, None, delka, time.time() - start_time
     return index, posloupnost, predpis, delka, time.time() - start_time
 
-MAX_TASKS = 1024
+POCET_ITERACI = None
+MAX_TIME = None
 
-def main_async(delka, profile, max_time = None):
+def main_async(cfg):
     start_time = time.time()
     
     # ipcluster start -n 7
-    client = ipp.Client(profile = profile)
+    client = ipp.Client(profile = cfg.async_profil)
     client[:].block = True
     print(client.ids)
     client[:].push(dict(vytvor_posloupnost = vytvor_posloupnost, 
@@ -272,16 +267,15 @@ def main_async(delka, profile, max_time = None):
                         existuje_3_mocnina_pro_delku_async = existuje_3_mocnina_pro_delku_async,
                         existuje_3_mocnina_pro_delku_async2 = existuje_3_mocnina_pro_delku_async2,
                         secti_usek = secti_usek,
-                        DELKA = delka,
-                        MAX_TIME = max_time,
-                        MAX_TASKS = MAX_TASKS))
+                        najdi_bez_3_mocniny = najdi_bez_3_mocniny,
+                        POCET_ITERACI = cfg.pocet_iteraci,
+                        MAX_TIME = cfg.max_doba_1_zpracovani))
 #     view = client.load_balanced_view()
     view = client.load_balanced_view()
     view.block = True
 
-    mapa = [0, 2, 1, 3]
-    print('abeceda', ABCD, 'mapa', mapa)
-    predpisy = generuj_predpisy(ABCD, mapa)
+    print('abeceda', ABCD, 'mapa', cfg.mapa)
+    predpisy = generuj_predpisy(ABCD, cfg.mapa)
     print('pocet predpisu', len(predpisy))
 
     _vysledky = view.map(najdi_bez_3_mocniny_async, predpisy)
@@ -308,13 +302,13 @@ def main_async(delka, profile, max_time = None):
         print('vysledky_nezpracovane', len(vysledky_nezpracovane))
 
         lvn = len(vysledky_nezpracovane)
-        if lvn < 20000:
+        if lvn <= cfg.max_delka_2_zpracovani:
             _vysledky2 = []
             l = 0
-            while l + MAX_TASKS <= lvn:
+            while l + cfg.max_vzdalenych_ukolu <= lvn:
                 print('zpracovavam', l, l + MAX_TASKS, time.time() - start_time)
-                _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:l + MAX_TASKS]))
-                l += MAX_TASKS
+                _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:l + cfg.max_vzdalenych_ukolu]))
+                l += cfg.max_vzdalenych_ukolu
             print('zpracovavam', l, lvn, time.time() - start_time)
             _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:lvn]))
             print('_vysledky2', len(_vysledky2))
@@ -334,14 +328,40 @@ def main_async(delka, profile, max_time = None):
     elapsed_time = time.time() - start_time
     print('Doba zpracovani (s)', elapsed_time)
 
-
+class Config:
+    def __init__(self):
+        self.default_pocet_iteraci = 10
+        self.default_async_profil = 'default'
+        self.default_async_zpracovani = False
+        self.default_max_doba_1_zpracovani = None
+        self.default_max_vzdalenych_ukolu = 1024
+        self.default_max_delka_2_zpracovani = 20000
+        self.default_mapa = [0, 2, 1, 3]
+        self.default_permutace = False
+        
+        parser = argparse.ArgumentParser(description='Generovani posloupnosti bez tretich mocnin.')
+        parser.add_argument('-i', '--iter', type=int, dest = 'pocet_iteraci', default = self.default_pocet_iteraci,
+                            help='pocet iteraci pri generovani posloupnosti')
+        parser.add_argument('-p', '--prof', dest = 'async_profil', default = self.default_async_profil,
+                            help='profil pro ipyparallel)')
+        parser.add_argument('-a', '--async', dest = 'async_zpracovani', default = self.default_async_zpracovani, action='store_true',
+                            help='asynchronni zpracovani (ipyparallel)')
+        parser.add_argument('-d', '--doba', type=int, dest = 'max_doba_1_zpracovani', default = self.default_max_doba_1_zpracovani,
+                            help='maximalni doba pro prvni fazi asynchronniho zpracovani')
+        parser.add_argument('-P', '--perm', dest = 'permutace', default = self.default_permutace,
+                            help='permutace zakladni mapy')
+        parser.add_argument('-u', '--ukoly', type=int, dest = 'max_vzdalenych_ukolu', default = self.default_max_vzdalenych_ukolu,
+                            help='maximalni pocet ukolu pro jednu distribuci')
+        parser.add_argument('-D', '--delka', type=int, dest = 'max_delka_2_zpracovani', default = self.default_max_delka_2_zpracovani,
+                            help='maximalni delka ukolu pro asynchronni zpracovani')
+        parser.add_argument('-m', '--mapa', dest = 'mapa', nargs = '+', default = self.default_mapa,
+                            help='mapa pro generovani predpisu')
+        parser.parse_args(namespace = self)
+            
 if __name__ == '__main__':
-    delka = 18 if not len(sys.argv) > 1 else int(sys.argv[1])
-    profile = 'default' if not len(sys.argv) > 2 else (sys.argv[2])
-    func = 'main_async' if not len(sys.argv) > 3 else (sys.argv[3])
-    max_time = None if not len(sys.argv) > 4 else int(sys.argv[4])
-    if func == 'async':
-        main_async(delka, profile, max_time)
+    cfg = Config()
+    if cfg.async_zpracovani:
+        main_async(cfg)
     else:
-        main_sync(delka, max_time)
+        main_sync(cfg)
 

@@ -75,7 +75,7 @@ L0123 = [0, 1, 2, 3]
 # ix[2] je index predpisu 1 : 2
 # ix[3] je index predpisu 1 : 2
 # ix obsahuje ruzne hodnoty z mnoziny [0, 1, 2, 3]
-def generuj_predpisy(abcd, ix):
+def generuj_predpisy(abcd, mapa):
     if len(abcd) != 4:
         raise ValueError('abeceda nema delku 4', abcd)
     predpisy = []
@@ -85,21 +85,21 @@ def generuj_predpisy(abcd, ix):
                 for l in L0123:
                     if k == l:
                         continue
-                    obraz0 = [abcd[ix[0]], abcd[ix[i]]]
-                    obraz1 = [abcd[ix[j]]]
-                    obraz2 = [abcd[ix[k]], abcd[ix[l]]]
+                    obraz0 = [abcd[mapa[0]], abcd[mapa[i]]]
+                    obraz1 = [abcd[mapa[j]]]
+                    obraz2 = [abcd[mapa[k]], abcd[mapa[l]]]
                     if porovnej_obrazy(obraz0, obraz2):
                         continue
                     for m in L0123:
                         for n in L0123:
                             if m == n:
                                 continue
-                            obraz3 = [abcd[ix[m]], abcd[ix[n]]]
+                            obraz3 = [abcd[mapa[m]], abcd[mapa[n]]]
                             if porovnej_obrazy(obraz0, obraz3):
                                 continue
                             if porovnej_obrazy(obraz2, obraz3):
                                 continue
-                            predpisy.append({abcd[ix[0]] : obraz0, abcd[ix[1]] : obraz1, abcd[ix[2]] : obraz2, abcd[ix[3]] : obraz3})
+                            predpisy.append({abcd[mapa[0]] : obraz0, abcd[mapa[1]] : obraz1, abcd[mapa[2]] : obraz2, abcd[mapa[3]] : obraz3})
     return predpisy
 
 def zkontroluj_predpis(delka, predpis):
