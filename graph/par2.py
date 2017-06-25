@@ -365,9 +365,9 @@ class Config:
 
 def main(cfg, mapa = None):
     if cfg.async_zpracovani:
-        main_async(cfg, mapa)
+        return main_async(cfg, mapa)
     else:
-        main_sync(cfg, mapa)
+        return main_sync(cfg, mapa)
                 
 if __name__ == '__main__':
     start_time = time.time()
