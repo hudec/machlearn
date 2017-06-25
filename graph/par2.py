@@ -98,11 +98,8 @@ def secti_usek(posloupnost, c1, c2):
 
 # zkontroluje, zda se v posloupnosti vyskytuji treti aditivni mocniny dane delky
 def existuje_3_mocnina_pro_delku(posloupnost, delka):
-    # pokud takovou mocninu najde, ihned skonci a vrati jednicku
-    for i in range(0, len(posloupnost) - 3 * delka):
-#         print(secti_usek(posloupnost, i, i + delka), (secti_usek(posloupnost, i + delka, i + 2 * delka)), (secti_usek(posloupnost, i + 2 * delka, i + 3 * delka)))
+    for i in range(0, len(posloupnost) - 3 * delka + 1):
         if secti_usek(posloupnost, i, i + delka) == secti_usek(posloupnost, i + delka, i + 2 * delka) == secti_usek(posloupnost, i + 2 * delka, i + 3 * delka):
-#             print(posloupnost[i : i + delka], posloupnost[i + delka : i + 2 * delka], posloupnost[i + 2 * delka : i + 3 * delka])
             return True
     return False
 
@@ -175,10 +172,10 @@ def najdi_bez_3_mocniny_sync(predpis, pocet_iteraci, max_time = None):
         return posloupnost, None
     return posloupnost, predpis
 
-def main_sync(cfg, mapa):
+def main_sync(cfg, mapa, index = 0):
     start_time = time.time()
 
-    print('abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
+    print(index, 'abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
     predpisy = generuj_predpisy(ABCD, mapa if mapa != None else cfg.mapa)
     print('pocet predpisu', len(predpisy))
 
@@ -198,13 +195,10 @@ def main_sync(cfg, mapa):
 def existuje_3_mocnina_pro_delku_async(posloupnost, delka, start_time):
     import time
     
-    # pokud takovou mocninu najde, ihned skonci a vrati jednicku
-    for i in range(0, len(posloupnost) - 3 * delka):
+    for i in range(0, len(posloupnost) - 3 * delka + 1):
         if time.time() - start_time >= MAX_TIME:
             return -1;
-#         print(secti_usek(posloupnost, i, i + delka), (secti_usek(posloupnost, i + delka, i + 2 * delka)), (secti_usek(posloupnost, i + 2 * delka, i + 3 * delka)))
         if secti_usek(posloupnost, i, i + delka) == secti_usek(posloupnost, i + delka, i + 2 * delka) == secti_usek(posloupnost, i + 2 * delka, i + 3 * delka):
-#             print(posloupnost[i : i + delka], posloupnost[i + delka : i + 2 * delka], posloupnost[i + 2 * delka : i + 3 * delka])
             return 1
     return 0
 
@@ -255,7 +249,7 @@ def existuje_3_mocnina_pro_delku_async2(in_po_pr_de):
 POCET_ITERACI = None
 MAX_TIME = None
 
-def main_async(cfg, mapa = None):
+def main_async(cfg, mapa = None, index = 0):
     start_time = time.time()
     
     # ipcluster start -n 7
@@ -277,7 +271,7 @@ def main_async(cfg, mapa = None):
     view = client.load_balanced_view()
     view.block = True
 
-    print('abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
+    print(index, 'abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
     predpisy = generuj_predpisy(ABCD, mapa if mapa != None else cfg.mapa)
     print('pocet predpisu', len(predpisy))
 
@@ -331,7 +325,7 @@ def main_async(cfg, mapa = None):
     elapsed_time = time.time() - start_time
     print('Doba zpracovani (s)', elapsed_time)
     
-    return vysledky_ok
+    return vysledky_ok.values()
 
 class Config:
     def __init__(self):
@@ -363,11 +357,11 @@ class Config:
                             help='mapa pro generovani predpisu')
         parser.parse_args(namespace = self)
 
-def main(cfg, mapa = None):
+def main(cfg, mapa = None, index = 0):
     if cfg.async_zpracovani:
-        return main_async(cfg, mapa)
+        return main_async(cfg, mapa, index)
     else:
-        return main_sync(cfg, mapa)
+        return main_sync(cfg, mapa, index)
                 
 if __name__ == '__main__':
     start_time = time.time()
@@ -377,13 +371,18 @@ if __name__ == '__main__':
     if cfg.permutace:
         permutace = list(itertools.permutations(cfg.mapa))
         print('pocet permutaci', len(permutace))
-        for mapa in permutace:
-            vysledky.extend(main(cfg, mapa))
+        for index, mapa in enumerate(permutace):
+            vysledky.extend(main(cfg, mapa, index))
     else:
         vysledky.extend(main(cfg))
 
     # TODO - duplicity
-    print('VYSLEDKY', len(vysledky))
+    print('VYSLEDKY, POCET', len(vysledky))
+    _vysledky = set()
+    for (po, pr) in vysledky:
+        print('XXX', type(po))
+        _vysledky.add('-'.join(map(str, po))) 
+    print('VYSLEDKY, POCET JEDNOZNACNY', len(_vysledky))
 
     elapsed_time = time.time() - start_time
     print('Doba zpracovani (s)', elapsed_time)
