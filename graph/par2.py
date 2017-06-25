@@ -303,7 +303,7 @@ def main_async(cfg, mapa = None, index = 0):
             _vysledky2 = []
             l = 0
             while l + cfg.max_vzdalenych_ukolu <= lvn:
-                print('zpracovavam', l, l + MAX_TASKS, time.time() - start_time)
+                print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu, time.time() - start_time)
                 _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:l + cfg.max_vzdalenych_ukolu]))
                 l += cfg.max_vzdalenych_ukolu
             print('zpracovavam', l, lvn, time.time() - start_time)
@@ -376,11 +376,9 @@ if __name__ == '__main__':
     else:
         vysledky.extend(main(cfg))
 
-    # TODO - duplicity
     print('VYSLEDKY, POCET', len(vysledky))
     _vysledky = set()
     for (po, pr) in vysledky:
-        print('XXX', type(po))
         _vysledky.add('-'.join(map(str, po))) 
     print('VYSLEDKY, POCET JEDNOZNACNY', len(_vysledky))
 
