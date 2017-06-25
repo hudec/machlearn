@@ -1,6 +1,6 @@
 import ipyparallel as ipp
 #from timeit import default_timer as clock
-import sys, time, argparse, signal
+import sys, time, argparse, signal, itertools
 from contextlib import contextmanager
 
 class TimeoutException(Exception): pass
@@ -60,7 +60,9 @@ def clear_prof_data():
     global PROF_DATA
     PROF_DATA = {}
 
-ABCD = [0, 1, 3, 4]
+ABCD  = [0, 1, 3, 4]
+ABCD2 = [0, 1, 3, 6]
+ABCD3 = [0, 1, 5, 8]
 
 # PREDPIS = {0 : [0, 3], 1 : [4, 3], 3 : [1], 4: [0, 1]}
 # print(vytvor_posloupnost(5, PREDPIS))
@@ -173,11 +175,11 @@ def najdi_bez_3_mocniny_sync(predpis, pocet_iteraci, max_time = None):
         return posloupnost, None
     return posloupnost, predpis
 
-def main_sync(cfg):
+def main_sync(cfg, mapa):
     start_time = time.time()
 
-    print('abeceda', ABCD, 'mapa', cfg.mapa)
-    predpisy = generuj_predpisy(ABCD, cfg.mapa)
+    print('abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
+    predpisy = generuj_predpisy(ABCD, mapa if mapa != None else cfg.mapa)
     print('pocet predpisu', len(predpisy))
 
     _vysledky = [najdi_bez_3_mocniny_sync(predpis, cfg.pocet_iteraci, cfg.max_doba_1_zpracovani) for predpis in predpisy]
@@ -190,6 +192,7 @@ def main_sync(cfg):
     print('Doba zpracovani (s)', elapsed_time)
 
 #     print_prof_data()
+    return vysledky_ok
 
 # zkontroluje, zda se v posloupnosti vyskytuji treti aditivni mocniny dane delky
 def existuje_3_mocnina_pro_delku_async(posloupnost, delka, start_time):
@@ -252,7 +255,7 @@ def existuje_3_mocnina_pro_delku_async2(in_po_pr_de):
 POCET_ITERACI = None
 MAX_TIME = None
 
-def main_async(cfg):
+def main_async(cfg, mapa = None):
     start_time = time.time()
     
     # ipcluster start -n 7
@@ -274,8 +277,8 @@ def main_async(cfg):
     view = client.load_balanced_view()
     view.block = True
 
-    print('abeceda', ABCD, 'mapa', cfg.mapa)
-    predpisy = generuj_predpisy(ABCD, cfg.mapa)
+    print('abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
+    predpisy = generuj_predpisy(ABCD, mapa if mapa != None else cfg.mapa)
     print('pocet predpisu', len(predpisy))
 
     _vysledky = view.map(najdi_bez_3_mocniny_async, predpisy)
@@ -327,6 +330,8 @@ def main_async(cfg):
 
     elapsed_time = time.time() - start_time
     print('Doba zpracovani (s)', elapsed_time)
+    
+    return vysledky_ok
 
 class Config:
     def __init__(self):
@@ -348,7 +353,7 @@ class Config:
                             help='asynchronni zpracovani (ipyparallel)')
         parser.add_argument('-d', '--doba', type=int, dest = 'max_doba_1_zpracovani', default = self.default_max_doba_1_zpracovani,
                             help='maximalni doba pro prvni fazi asynchronniho zpracovani')
-        parser.add_argument('-P', '--perm', dest = 'permutace', default = self.default_permutace,
+        parser.add_argument('-P', '--perm', dest = 'permutace', default = self.default_permutace, action='store_true',
                             help='permutace zakladni mapy')
         parser.add_argument('-u', '--ukoly', type=int, dest = 'max_vzdalenych_ukolu', default = self.default_max_vzdalenych_ukolu,
                             help='maximalni pocet ukolu pro jednu distribuci')
@@ -357,11 +362,28 @@ class Config:
         parser.add_argument('-m', '--mapa', dest = 'mapa', nargs = '+', default = self.default_mapa,
                             help='mapa pro generovani predpisu')
         parser.parse_args(namespace = self)
-            
-if __name__ == '__main__':
-    cfg = Config()
-    if cfg.async_zpracovani:
-        main_async(cfg)
-    else:
-        main_sync(cfg)
 
+def main(cfg, mapa = None):
+    if cfg.async_zpracovani:
+        main_async(cfg, mapa)
+    else:
+        main_sync(cfg, mapa)
+                
+if __name__ == '__main__':
+    start_time = time.time()
+    
+    cfg = Config()
+    vysledky = []
+    if cfg.permutace:
+        permutace = list(itertools.permutations(cfg.mapa))
+        print('pocet permutaci', len(permutace))
+        for mapa in permutace:
+            vysledky.extend(main(cfg, mapa))
+    else:
+        vysledky.extend(main(cfg))
+
+    # TODO - duplicity
+    print('VYSLEDKY', len(vysledky))
+
+    elapsed_time = time.time() - start_time
+    print('Doba zpracovani (s)', elapsed_time)
