@@ -415,8 +415,14 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
         print('pocet predpisu', len(predpisy))
         _vysledky = view.map(najdi_bez_3_mocniny_async, predpisy)
     else:
-        print('pocet posloupnosti', len(posloupnosti))
-        _vysledky = view.map(existuje_3_mocnina_async2, posloupnosti)
+        lpo = len(posloupnosti)
+        print('pocet posloupnosti', lpo)
+        _vysledky = []
+        l = 0
+        while l + cfg.max_vzdalenych_ukolu <= lpo:
+            print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
+            _vysledky.extend(view.map(existuje_3_mocnina_async2, posloupnosti[l:l + cfg.max_vzdalenych_ukolu]))
+            l += cfg.max_vzdalenych_ukolu
     
     vysledky_nezpracovane_pocet = 0
     vysledky_nezpracovane = []
