@@ -188,6 +188,11 @@ def najdi_bez_3_mocniny(predpis, pocet_iteraci):
         return None, None
     return posloupnost, predpis
 
+def najdi_bez_3_mocniny2(posloupnost, predpis):
+    if existuje_3_mocnina(posloupnost):
+        return None, None
+    return posloupnost, predpis
+
 def najdi_bez_3_mocniny_sync(predpis, pocet_iteraci, max_time = None):
     if max_time == None:
         return najdi_bez_3_mocniny(predpis, pocet_iteraci)
@@ -209,14 +214,15 @@ def main_sync(cfg, mapa, index = 0, posloupnosti = None):
         print(index, 'abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
         predpisy = generuj_predpisy(ABCD, mapa if mapa != None else cfg.mapa)
         print('pocet predpisu', len(predpisy))
-    
         _vysledky = [najdi_bez_3_mocniny_sync(predpis, cfg.pocet_iteraci, cfg.max_doba_1_zpracovani) for predpis in predpisy]
-        vysledky = [(po, pr) for (po, pr) in _vysledky if po != None]
-        print('vysledky', len(vysledky))
-        vysledky_ok = [(po, pr) for (po, pr) in vysledky if pr != None]
-        print('vysledky_ok', len(vysledky_ok), vysledky_ok)
     else:
-        pass
+        print('pocet posloupnosti', len(posloupnosti))
+        _vysledky = [najdi_bez_3_mocniny2(po, pr) for (po, pr) in posloupnosti]
+
+    vysledky = [(po, pr) for (po, pr) in _vysledky if po != None]
+    print('vysledky', len(vysledky))
+    vysledky_ok = [(po, pr) for (po, pr) in vysledky if pr != None]
+    print('vysledky_ok', len(vysledky_ok), vysledky_ok)
 
     elapsed_time = time.time() - start_time
     print('Doba zpracovani (s)', elapsed_time)
