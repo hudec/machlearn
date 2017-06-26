@@ -434,6 +434,53 @@ def main_async(cfg, mapa = None, index = 0):
     
     return vysledky_ok.values()
 
+def vytvor_posloupnost_async(predpis):
+    return (vytvor_posloupnost(predpis, POCET_ITERACI), predpis)
+
+def posloupnosti_async(cfg):
+
+    client = ipp.Client(profile = cfg.async_profil)
+    client[:].block = True
+    print(client.ids)
+
+    print('abeceda', ABCD)
+    predpisy = []
+    if cfg.permutace:
+        permutace = list(itertools.permutations(cfg.mapa))
+        print('pocet permutaci', len(permutace))
+        for index, mapa in enumerate(permutace):
+            print(index, mapa)
+            predpisy.extend(generuj_predpisy(ABCD, mapa))
+    else:
+        predpisy.extend(generuj_predpisy(ABCD, cfg.mapa))
+    lpr = len(predpisy)
+    print('pocet predpisu', lpr)
+    
+    client[:].push(dict(vytvor_posloupnost_async = vytvor_posloupnost_async, 
+                        vytvor_posloupnost = vytvor_posloupnost, 
+                        iteruj_posloupnost = iteruj_posloupnost, 
+                        POCET_ITERACI = cfg.pocet_iteraci))
+    view = client.load_balanced_view()
+    view.block = True
+
+    posloupnosti = []
+    l = 0
+    while l + cfg.max_vzdalenych_ukolu <= lpr:
+        print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
+        posloupnosti.extend(view.map(vytvor_posloupnost_async, predpisy[l:l + cfg.max_vzdalenych_ukolu]))
+        l += cfg.max_vzdalenych_ukolu
+            
+    _posloupnosti = set()
+    posloupnosti_ok = []
+    for (po, pr) in posloupnosti: 
+        _po = '-'.join(map(str, po))
+        if not _po in _posloupnosti:
+            posloupnosti_ok.append((po, pr))
+            _posloupnosti.add(_po)
+    print('pocet posloupnosti', len(posloupnosti_ok))
+
+    return posloupnosti_ok
+
 class Config:
     def __init__(self):
         self.default_pocet_iteraci = 10
@@ -479,7 +526,10 @@ if __name__ == '__main__':
     cfg = Config()
     
     if cfg.generuj_posloupnosti:
-        posloupnosti = posloupnosti_sync(cfg)
+        if cfg.async_zpracovani:
+            posloupnosti = posloupnosti_async(cfg)
+        else:
+            posloupnosti = posloupnosti_sync(cfg)
     
     else:
         vysledky = []
