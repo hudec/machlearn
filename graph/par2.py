@@ -222,29 +222,61 @@ def main_sync(cfg, mapa, index = 0):
     return vysledky_ok
 
 # zkontroluje, zda se v posloupnosti vyskytuji treti aditivni mocniny dane delky
-def existuje_3_mocnina_pro_delku_async(posloupnost, delka, start_time):
+def existuje_3_mocnina_pro_delku_async(posloupnost, delka, stare_delky, nove_delky, start_time):
     import time
     
-    for i in range(0, len(posloupnost) - 3 * delka + 1):
+    konec = len(posloupnost) - 3 * delka + 1
+    for i in range(0, konec):
         if time.time() - start_time >= MAX_TIME:
             return -1;
-        if secti_usek(posloupnost, i, i + delka) == secti_usek(posloupnost, i + delka, i + 2 * delka) == secti_usek(posloupnost, i + 2 * delka, i + 3 * delka):
+        
+        if i in nove_delky:
+            d1 = nove_delky[i]
+        elif stare_delky != None:
+            d1 = stare_delky[i] + posloupnost[i + delka - 1]
+            nove_delky[i] = d1
+        else: # delka = 1
+            d1 = posloupnost[i]
+            nove_delky[i] = d1
+        j = i + delka
+        if j in nove_delky:
+            d2 = nove_delky[j]
+        elif stare_delky != None:
+            d2 = stare_delky[j] + posloupnost[j + delka - 1]
+            nove_delky[j] = d2
+        else: # delka = 1
+            d2 = posloupnost[j]
+            nove_delky[j] = d2
+        k = j + delka
+        if k in nove_delky:
+            d3 = nove_delky[k]
+        elif stare_delky != None:
+            d3 = stare_delky[k] + posloupnost[k + delka - 1]
+            nove_delky[k] = d3
+        else: # delka = 1
+            d3 = posloupnost[k]
+            nove_delky[k] = d3
+        
+        if d1 == d2 == d3:
             return 1
+
     return 0
 
 # pro danou posloupnost zkontroluje vyskyt libovolnych tretich mocnin
 def existuje_3_mocnina_async(posloupnost, predpis, start_time):
     import time
     
+    stare_delky, nove_delky = None, {}
     # pokud zadnou treti mocninu nenajde, vypise danou posloupnost
     for delka in range(1, len(posloupnost) // 3):
         if time.time() - start_time >= MAX_TIME:
             return posloupnost, None
-        rc = existuje_3_mocnina_pro_delku_async(posloupnost, delka, start_time)
+        rc = existuje_3_mocnina_pro_delku_async(posloupnost, delka, stare_delky, nove_delky, start_time)
         if rc == 1:
             return None, None
         if rc == -1:
             return posloupnost, None
+        stare_delky, nove_delky = nove_delky, {}
     return posloupnost, predpis
 
 def najdi_bez_3_mocniny_async(predpis):
