@@ -202,18 +202,21 @@ def najdi_bez_3_mocniny_sync(predpis, pocet_iteraci, max_time = None):
         return posloupnost, None
     return posloupnost, predpis
 
-def main_sync(cfg, mapa, index = 0):
+def main_sync(cfg, mapa, index = 0, posloupnosti = None):
     start_time = time.time()
 
-    print(index, 'abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
-    predpisy = generuj_predpisy(ABCD, mapa if mapa != None else cfg.mapa)
-    print('pocet predpisu', len(predpisy))
-
-    _vysledky = [najdi_bez_3_mocniny_sync(predpis, cfg.pocet_iteraci, cfg.max_doba_1_zpracovani) for predpis in predpisy]
-    vysledky = [(po, pr) for (po, pr) in _vysledky if po != None]
-    print('vysledky', len(vysledky))
-    vysledky_ok = [(po, pr) for (po, pr) in vysledky if pr != None]
-    print('vysledky_ok', len(vysledky_ok), vysledky_ok)
+    if posloupnosti == None:
+        print(index, 'abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
+        predpisy = generuj_predpisy(ABCD, mapa if mapa != None else cfg.mapa)
+        print('pocet predpisu', len(predpisy))
+    
+        _vysledky = [najdi_bez_3_mocniny_sync(predpis, cfg.pocet_iteraci, cfg.max_doba_1_zpracovani) for predpis in predpisy]
+        vysledky = [(po, pr) for (po, pr) in _vysledky if po != None]
+        print('vysledky', len(vysledky))
+        vysledky_ok = [(po, pr) for (po, pr) in vysledky if pr != None]
+        print('vysledky_ok', len(vysledky_ok), vysledky_ok)
+    else:
+        pass
 
     elapsed_time = time.time() - start_time
     print('Doba zpracovani (s)', elapsed_time)
@@ -306,6 +309,27 @@ def existuje_3_mocnina_async(posloupnost, predpis, start_time):
         stare_delky, nove_delky = nove_delky, {}
     return posloupnost, predpis
 
+# pro danou posloupnost zkontroluje vyskyt libovolnych tretich mocnin
+def existuje_3_mocnina_async2(po_pr):
+    import time
+
+    start_time = time.time()
+    
+    (posloupnost, predpis) = po_pr
+    
+    stare_delky, nove_delky = None, {}
+    # pokud zadnou treti mocninu nenajde, vypise danou posloupnost
+    for delka in range(1, len(posloupnost) // 3):
+        if time.time() - start_time >= MAX_TIME:
+            return posloupnost, None
+        rc = existuje_3_mocnina_pro_delku_async(posloupnost, delka, stare_delky, nove_delky, start_time)
+        if rc == 1:
+            return None, None
+        if rc == -1:
+            return posloupnost, None
+        stare_delky, nove_delky = nove_delky, {}
+    return posloupnost, predpis
+
 def najdi_bez_3_mocniny_async(predpis):
     import time
 
@@ -356,7 +380,7 @@ def existuje_3_mocnina_pro_delku_async2(in_po_pr_de):
 POCET_ITERACI = None
 MAX_TIME = None
 
-def main_async(cfg, mapa = None, index = 0):
+def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
     start_time = time.time()
     
     # ipcluster start -n 7
@@ -367,6 +391,7 @@ def main_async(cfg, mapa = None, index = 0):
                         iteruj_posloupnost = iteruj_posloupnost, 
                         existuje_3_mocnina = existuje_3_mocnina, 
                         existuje_3_mocnina_async = existuje_3_mocnina_async,
+                        existuje_3_mocnina_async2 = existuje_3_mocnina_async2,
                         existuje_3_mocnina_pro_delku = existuje_3_mocnina_pro_delku,
                         existuje_3_mocnina_pro_delku_async = existuje_3_mocnina_pro_delku_async,
                         existuje_3_mocnina_pro_delku_async2 = existuje_3_mocnina_pro_delku_async2,
@@ -378,11 +403,15 @@ def main_async(cfg, mapa = None, index = 0):
     view = client.load_balanced_view()
     view.block = True
 
-    print(index, 'abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
-    predpisy = generuj_predpisy(ABCD, mapa if mapa != None else cfg.mapa)
-    print('pocet predpisu', len(predpisy))
-
-    _vysledky = view.map(najdi_bez_3_mocniny_async, predpisy)
+    if posloupnosti == None:
+        print(index, 'abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
+        predpisy = generuj_predpisy(ABCD, mapa if mapa != None else cfg.mapa)
+        print('pocet predpisu', len(predpisy))
+        _vysledky = view.map(najdi_bez_3_mocniny_async, predpisy)
+    else:
+        print('pocet posloupnosti', len(posloupnosti))
+        _vysledky = view.map(existuje_3_mocnina_async2, posloupnosti)
+    
     vysledky_nezpracovane_pocet = 0
     vysledky_nezpracovane = []
     vysledky_ok = {}
@@ -524,15 +553,22 @@ if __name__ == '__main__':
     start_time = time.time()
     
     cfg = Config()
+    posloupnosti = None
+    vysledky = []
     
     if cfg.generuj_posloupnosti:
+        posloupnosti = posloupnosti_sync(cfg)
+#         if cfg.async_zpracovani:
+#             posloupnosti = posloupnosti_async(cfg)
+#         else:
+#             posloupnosti = posloupnosti_sync(cfg)
         if cfg.async_zpracovani:
-            posloupnosti = posloupnosti_async(cfg)
+            vysledky.extend(main_async(cfg, None, None, posloupnosti))
         else:
-            posloupnosti = posloupnosti_sync(cfg)
+            vysledky.extend(main_sync(cfg, None, None, posloupnosti))
+        print('VYSLEDKY, POCET', len(vysledky))
     
     else:
-        vysledky = []
         if cfg.permutace:
             permutace = list(itertools.permutations(cfg.mapa))
             print('pocet permutaci', len(permutace))
