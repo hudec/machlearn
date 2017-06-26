@@ -221,6 +221,33 @@ def main_sync(cfg, mapa, index = 0):
 #     print_prof_data()
     return vysledky_ok
 
+def posloupnosti_sync(cfg):
+
+    print('abeceda', ABCD)
+    predpisy = []
+    if cfg.permutace:
+        permutace = list(itertools.permutations(cfg.mapa))
+        print('pocet permutaci', len(permutace))
+        for index, mapa in enumerate(permutace):
+            print(index, mapa)
+            predpisy.extend(generuj_predpisy(ABCD, mapa))
+    else:
+        predpisy.extend(generuj_predpisy(ABCD, cfg.mapa))
+    print('pocet predpisu', len(predpisy))
+    
+    posloupnosti = []
+    _posloupnosti = set()
+            
+    for pr in predpisy: 
+        po = vytvor_posloupnost(pr, cfg.pocet_iteraci)
+        _po = '-'.join(map(str, po))
+        if not _po in _posloupnosti:
+            posloupnosti.append((po, pr))
+            _posloupnosti.add(_po)
+    print('pocet posloupnosti', len(posloupnosti))
+
+    return posloupnosti
+
 # zkontroluje, zda se v posloupnosti vyskytuji treti aditivni mocniny dane delky
 def existuje_3_mocnina_pro_delku_async(posloupnost, delka, stare_delky, nove_delky, start_time):
     import time
@@ -417,6 +444,7 @@ class Config:
         self.default_max_delka_2_zpracovani = 20000
         self.default_mapa = [0, 2, 1, 3]
         self.default_permutace = False
+        self.default_generuj_posloupnosti = False
         
         parser = argparse.ArgumentParser(description='Generovani posloupnosti bez tretich mocnin.')
         parser.add_argument('-i', '--iter', type=int, dest = 'pocet_iteraci', default = self.default_pocet_iteraci,
@@ -435,6 +463,8 @@ class Config:
                             help='maximalni delka ukolu pro asynchronni zpracovani')
         parser.add_argument('-m', '--mapa', dest = 'mapa', nargs = '+', default = self.default_mapa,
                             help='mapa pro generovani predpisu')
+        parser.add_argument('-g', '--gen', dest = 'generuj_posloupnosti', default = self.default_generuj_posloupnosti, action='store_true',
+                            help='generuje pro vsechny mapy a predpisy jednu mnozinu posloupnosti')
         parser.parse_args(namespace = self)
 
 def main(cfg, mapa = None, index = 0):
@@ -447,20 +477,25 @@ if __name__ == '__main__':
     start_time = time.time()
     
     cfg = Config()
-    vysledky = []
-    if cfg.permutace:
-        permutace = list(itertools.permutations(cfg.mapa))
-        print('pocet permutaci', len(permutace))
-        for index, mapa in enumerate(permutace):
-            vysledky.extend(main(cfg, mapa, index))
+    
+    if cfg.generuj_posloupnosti:
+        posloupnosti = posloupnosti_sync(cfg)
+    
     else:
-        vysledky.extend(main(cfg))
-
-    print('VYSLEDKY, POCET', len(vysledky))
-    _vysledky = set()
-    for (po, pr) in vysledky:
-        _vysledky.add('-'.join(map(str, po))) 
-    print('VYSLEDKY, POCET JEDNOZNACNY', len(_vysledky))
+        vysledky = []
+        if cfg.permutace:
+            permutace = list(itertools.permutations(cfg.mapa))
+            print('pocet permutaci', len(permutace))
+            for index, mapa in enumerate(permutace):
+                vysledky.extend(main(cfg, mapa, index))
+        else:
+            vysledky.extend(main(cfg))
+    
+        print('VYSLEDKY, POCET', len(vysledky))
+        _vysledky = set()
+        for (po, pr) in vysledky:
+            _vysledky.add('-'.join(map(str, po))) 
+        print('VYSLEDKY, POCET JEDNOZNACNY', len(_vysledky))
 
     elapsed_time = time.time() - start_time
     print('Doba zpracovani (s)', elapsed_time)
