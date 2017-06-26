@@ -299,12 +299,30 @@ def existuje_3_mocnina_pro_delku_async2(in_po_pr_de):
     start_time = time.time()
     
     (index, posloupnost, predpis, delka) = in_po_pr_de
+    konec = len(posloupnost) - 3 * delka + 1
+    delky = {}
     
     # pokud takovou mocninu najde, ihned skonci a vrati jednicku
-    for i in range(0, len(posloupnost) - 3 * delka):
-#         print(secti_usek(posloupnost, i, i + delka), (secti_usek(posloupnost, i + delka, i + 2 * delka)), (secti_usek(posloupnost, i + 2 * delka, i + 3 * delka)))
-        if secti_usek(posloupnost, i, i + delka) == secti_usek(posloupnost, i + delka, i + 2 * delka) == secti_usek(posloupnost, i + 2 * delka, i + 3 * delka):
-#             print(posloupnost[i : i + delka], posloupnost[i + delka : i + 2 * delka], posloupnost[i + 2 * delka : i + 3 * delka])
+    for i in range(0, konec):
+        if i in delky:
+            d1 = delky[i]
+        else:
+            d1 = secti_usek(posloupnost, i, i + delka)
+            delky[i] = d1
+        j = i + delka
+        if j in delky:
+            d2 = delky[j]
+        else:
+            d2 = secti_usek(posloupnost, j, j + delka)
+            delky[j] = d2
+        k = j + delka
+        if k in delky:
+            d3 = delky[k]
+        else:
+            d3 = secti_usek(posloupnost, k, k + delka)
+            delky[k] = d3
+        
+        if d1 == d2 == d3:
             return index, posloupnost, None, delka, time.time() - start_time
     return index, posloupnost, predpis, delka, time.time() - start_time
 
