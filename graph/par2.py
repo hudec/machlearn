@@ -533,6 +533,7 @@ class Config:
         self.default_mapa = [0, 2, 1, 3]
         self.default_permutace = False
         self.default_generuj_posloupnosti = False
+        self.default_async_generuj_posloupnosti = False
         
         parser = argparse.ArgumentParser(description='Generovani posloupnosti bez tretich mocnin.')
         parser.add_argument('-i', '--iter', type=int, dest = 'pocet_iteraci', default = self.default_pocet_iteraci,
@@ -553,6 +554,8 @@ class Config:
                             help='mapa pro generovani predpisu')
         parser.add_argument('-g', '--gen', dest = 'generuj_posloupnosti', default = self.default_generuj_posloupnosti, action='store_true',
                             help='generuje pro vsechny mapy a predpisy jednu mnozinu posloupnosti')
+        parser.add_argument('-G', '--agen', dest = 'async_generuj_posloupnosti', default = self.default_async_generuj_posloupnosti, action='store_true',
+                            help='generuje pro vsechny mapy a predpisy jednu mnozinu posloupnosti asynchronne')
         parser.parse_args(namespace = self)
 
 def main(cfg, mapa = None, index = 0):
@@ -568,12 +571,11 @@ if __name__ == '__main__':
     posloupnosti = None
     vysledky = []
     
-    if cfg.generuj_posloupnosti:
-        posloupnosti = posloupnosti_sync(cfg)
-#         if cfg.async_zpracovani:
-#             posloupnosti = posloupnosti_async(cfg)
-#         else:
-#             posloupnosti = posloupnosti_sync(cfg)
+    if cfg.generuj_posloupnosti or cfg.async_generuj_posloupnosti:
+        if cfg.async_generuj_posloupnosti:
+            posloupnosti = posloupnosti_async(cfg)
+        else:
+            posloupnosti = posloupnosti_sync(cfg)
         if cfg.async_zpracovani:
             vysledky.extend(main_async(cfg, None, None, posloupnosti))
         else:
