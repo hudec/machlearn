@@ -60,9 +60,7 @@ def clear_prof_data():
     global PROF_DATA
     PROF_DATA = {}
 
-ABCD  = [0, 1, 3, 4]
-ABCD2 = [0, 1, 3, 6]
-ABCD3 = [0, 1, 5, 8]
+ABCD  = [[0, 1, 3, 4], [0, 1, 3, 6], [0, 1, 5, 8]]
 
 # PREDPIS = {0 : [0, 3], 1 : [4, 3], 3 : [1], 4: [0, 1]}
 # print(vytvor_posloupnost(5, PREDPIS))
@@ -73,7 +71,7 @@ ABCD3 = [0, 1, 5, 8]
 def iteruj_posloupnost(posloupnost, predpis):
     novy = []
     for p in posloupnost:
-        novy.extend(predpis[p])
+        novy.extend(predpis[p]) 
     return novy
 
 # pro zadane pocatecni cislo a pocet iteraci vytvori posloupnost
@@ -211,8 +209,8 @@ def main_sync(cfg, mapa, index = 0, posloupnosti = None):
     start_time = time.time()
 
     if posloupnosti == None:
-        print(index, 'abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
-        predpisy = generuj_predpisy(ABCD, mapa if mapa != None else cfg.mapa)
+        print(index, 'abeceda', ABCD[cfg.abeceda], 'mapa', mapa if mapa != None else cfg.mapa)
+        predpisy = generuj_predpisy(ABCD[cfg.abeceda], mapa if mapa != None else cfg.mapa)
         print('pocet predpisu', len(predpisy))
         _vysledky = [najdi_bez_3_mocniny_sync(predpis, cfg.pocet_iteraci, cfg.max_doba_1_zpracovani) for predpis in predpisy]
     else:
@@ -222,7 +220,7 @@ def main_sync(cfg, mapa, index = 0, posloupnosti = None):
     vysledky = [(po, pr) for (po, pr) in _vysledky if po != None]
     print('vysledky', len(vysledky))
     vysledky_ok = [(po, pr) for (po, pr) in vysledky if pr != None]
-    print('vysledky_ok', len(vysledky_ok), vysledky_ok)
+    print('vysledky_ok', len(vysledky_ok)) #, vysledky_ok)
 
     elapsed_time = time.time() - start_time
     print('Doba zpracovani (s)', elapsed_time)
@@ -233,16 +231,16 @@ def main_sync(cfg, mapa, index = 0, posloupnosti = None):
 def posloupnosti_sync(cfg):
     start_time = time.time()
 
-    print('abeceda', ABCD)
+    print('abeceda', ABCD[cfg.abeceda])
     predpisy = []
     if cfg.permutace:
         permutace = list(itertools.permutations(cfg.mapa))
         print('pocet permutaci', len(permutace))
         for index, mapa in enumerate(permutace):
-            print(index, mapa)
-            predpisy.extend(generuj_predpisy(ABCD, mapa))
+#             print(index, mapa)
+            predpisy.extend(generuj_predpisy(ABCD[cfg.abeceda], mapa))
     else:
-        predpisy.extend(generuj_predpisy(ABCD, cfg.mapa))
+        predpisy.extend(generuj_predpisy(ABCD[cfg.abeceda], cfg.mapa))
     print('pocet predpisu', len(predpisy))
     
     posloupnosti = []
@@ -414,8 +412,8 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
     view.block = True
 
     if posloupnosti == None:
-        print(index, 'abeceda', ABCD, 'mapa', mapa if mapa != None else cfg.mapa)
-        predpisy = generuj_predpisy(ABCD, mapa if mapa != None else cfg.mapa)
+        print(index, 'abeceda', ABCD[cfg.abeceda], 'mapa', mapa if mapa != None else cfg.mapa)
+        predpisy = generuj_predpisy(ABCD[cfg.abeceda], mapa if mapa != None else cfg.mapa)
         print('pocet predpisu', len(predpisy))
         _vysledky = view.map(najdi_bez_3_mocniny_async, predpisy)
     else:
@@ -496,16 +494,16 @@ def posloupnosti_async(cfg):
     client[:].block = True
     print(client.ids)
 
-    print('abeceda', ABCD)
+    print('abeceda', ABCD[cfg.abeceda])
     predpisy = []
     if cfg.permutace:
         permutace = list(itertools.permutations(cfg.mapa))
         print('pocet permutaci', len(permutace))
         for index, mapa in enumerate(permutace):
-            print(index, mapa)
-            predpisy.extend(generuj_predpisy(ABCD, mapa))
+#             print(index, mapa)
+            predpisy.extend(generuj_predpisy(ABCD[cfg.abeceda], mapa))
     else:
-        predpisy.extend(generuj_predpisy(ABCD, cfg.mapa))
+        predpisy.extend(generuj_predpisy(ABCD[cfg.abeceda], cfg.mapa))
     lpr = len(predpisy)
     print('pocet predpisu', lpr)
     
@@ -550,6 +548,7 @@ class Config:
         self.default_max_doba_1_zpracovani = None
         self.default_max_vzdalenych_ukolu = 1024
         self.default_max_delka_2_zpracovani = 20000
+        self.default_abeceda = 0
         self.default_mapa = [0, 2, 1, 3]
         self.default_permutace = False
         self.default_generuj_posloupnosti = False
@@ -576,6 +575,8 @@ class Config:
                             help='generuje pro vsechny mapy a predpisy jednu mnozinu posloupnosti')
         parser.add_argument('-G', '--agen', dest = 'async_generuj_posloupnosti', default = self.default_async_generuj_posloupnosti, action='store_true',
                             help='generuje pro vsechny mapy a predpisy jednu mnozinu posloupnosti asynchronne')
+        parser.add_argument('-A', '--abcd', type=int, dest = 'abeceda', default = self.default_abeceda,
+                            help='index abecedy [0, 1, 3, 4], [0, 1, 3, 6], [0, 1, 5, 8]')
         parser.parse_args(namespace = self)
 
 def main(cfg, mapa = None, index = 0):
