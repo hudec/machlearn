@@ -380,7 +380,7 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
             vysledky_ok[ix] = (po, pr)
             continue
         vysledky_nezpracovane_pocet += 1
-        print('len(po) // 3', len(po) // 3)
+        print('len(po) // 3', len(po) // 3, ix)
         for delka in range(1, (len(po) // 3) + 1):
             vysledky_nezpracovane.append((ix, po, pr, delka))
     
@@ -401,7 +401,7 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
                 l += cfg.max_vzdalenych_ukolu
             print('_vysledky2', len(_vysledky2))
              
-            for (ix, st, po, pr, de) in _vysledky2:
+            for (st, ix, po, pr, de) in _vysledky2:
                 if st == TRETI_MOCNINA_OK:
                     if ix in vysledky_ok:
                         print('mazu', ix)
