@@ -547,7 +547,7 @@ class Config:
         self.default_async_zpracovani = False
         self.default_max_doba_1_zpracovani = None
         self.default_max_vzdalenych_ukolu = 1024
-        self.default_max_delka_2_zpracovani = 20000
+        self.default_max_delka_2_zpracovani = 10000
         self.default_abeceda = 0
         self.default_mapa = [0, 2, 1, 3]
         self.default_permutace = False
