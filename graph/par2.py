@@ -2,6 +2,7 @@ import ipyparallel as ipp
 #from timeit import default_timer as clock
 import sys, time, argparse, signal, itertools
 from contextlib import contextmanager
+#from graph.seq1 import predpisy
 
 class TimeoutException(Exception): pass
 
@@ -67,78 +68,6 @@ ABCD  = [[0, 1, 3, 4], [0, 1, 3, 6], [0, 1, 5, 8]]
 # posloupnost_12 = vytvor_posloupnost(12, PREDPIS)
 # print(12, PREDPIS, existuje_3_mocnina(posloupnost_12))
 
-# danou posloupnost prodlouzi o jednu iteraci - kazde cislo posle na svuj obraz
-def iteruj_posloupnost(posloupnost, predpis):
-    novy = []
-    for p in posloupnost:
-        novy.extend(predpis[p]) 
-    return novy
-
-# pro zadane pocatecni cislo a pocet iteraci vytvori posloupnost
-def vytvor_posloupnost(predpis, pocet_iteraci):
-    posloupnost = None
-    for k in predpis.keys():
-        if k == predpis[k][0]:
-            posloupnost = [k]
-            break
-    if posloupnost == None:
-        raise ValueError('predpis nema zacatek', predpis)
-    for _ in range(pocet_iteraci):
-        posloupnost = iteruj_posloupnost(posloupnost, predpis)
-    return posloupnost
-
-# secte dany usek posloupnosti
-def secti_usek(posloupnost, c1, c2):
-    soucet = 0
-    for i in range(c1, c2):
-        soucet = soucet + posloupnost[i]
-    return soucet      
-
-def existuje_3_mocnina_pro_delku(posloupnost, delka, stare_delky, nove_delky):
-#     print('delka', delka, len(posloupnost))
-    konec = len(posloupnost) - 3 * delka + 1
-    for i in range(0, konec):
-        if i in nove_delky:
-            d1 = nove_delky[i]
-        elif stare_delky != None:
-            d1 = stare_delky[i] + posloupnost[i + delka - 1]
-            nove_delky[i] = d1
-        else: # delka = 1
-            d1 = posloupnost[i]
-            nove_delky[i] = d1
-        j = i + delka
-        if j in nove_delky:
-            d2 = nove_delky[j]
-        elif stare_delky != None:
-            d2 = stare_delky[j] + posloupnost[j + delka - 1]
-            nove_delky[j] = d2
-        else: # delka = 1
-            d2 = posloupnost[j]
-            nove_delky[j] = d2
-        k = j + delka
-        if k in nove_delky:
-            d3 = nove_delky[k]
-        elif stare_delky != None:
-            d3 = stare_delky[k] + posloupnost[k + delka - 1]
-            nove_delky[k] = d3
-        else: # delka = 1
-            d3 = posloupnost[k]
-            nove_delky[k] = d3
-        
-        if d1 == d2 == d3:
-            return True
-    return False
-
-# pro danou posloupnost zkontroluje vyskyt libovolnych tretich mocnin
-def existuje_3_mocnina(posloupnost):
-    stare_delky, nove_delky = None, {}
-    # pokud zadnou treti mocninu nenajde, vypise danou posloupnost
-    for delka in range(1, len(posloupnost) // 3):
-        if existuje_3_mocnina_pro_delku(posloupnost, delka, stare_delky, nove_delky):
-            return True
-        stare_delky, nove_delky = nove_delky, {}
-    return False
-
 def porovnej_obrazy(o1, o2):
     if o1[0] == o2[0] and o1[1] == o2[1]:
         return True
@@ -180,29 +109,95 @@ def generuj_predpisy(abcd, mapa):
                             predpisy.append({abcd[mapa[0]] : obraz0, abcd[mapa[1]] : obraz1, abcd[mapa[2]] : obraz2, abcd[mapa[3]] : obraz3})
     return predpisy
 
-def najdi_bez_3_mocniny(predpis, pocet_iteraci):
-    posloupnost = vytvor_posloupnost(predpis, pocet_iteraci)
-    if existuje_3_mocnina(posloupnost):
-        return None, None
-    return posloupnost, predpis
 
-def najdi_bez_3_mocniny2(posloupnost, predpis):
-    if existuje_3_mocnina(posloupnost):
-        return None, None
-    return posloupnost, predpis
+# danou posloupnost prodlouzi o jednu iteraci - kazde cislo posle na svuj obraz
+def iteruj_posloupnost(posloupnost, predpis):
+    novy = []
+    for p in posloupnost:
+        novy.extend(predpis[p]) 
+    return novy
 
-def najdi_bez_3_mocniny_sync(predpis, pocet_iteraci, max_time = None):
+# pro zadane pocatecni cislo a pocet iteraci vytvori posloupnost
+def vytvor_posloupnost(predpis, pocet_iteraci):
+    posloupnost = None
+    for k in predpis.keys():
+        if k == predpis[k][0]:
+            posloupnost = [k]
+            break
+    if posloupnost == None:
+        raise ValueError('predpis nema zacatek', predpis)
+    for _ in range(pocet_iteraci):
+        posloupnost = iteruj_posloupnost(posloupnost, predpis)
+    return posloupnost
+
+TIMEOUT = 1
+TRETI_MOCNINA_OK = 2
+TRETI_MOCNINA_NOK = 3
+
+# zkontroluje, zda se v posloupnosti vyskytuji treti aditivni mocniny dane delky
+def existuje_3_mocnina_pro_delku(posloupnost, delka, stare_delky, nove_delky, start_time = None):
+    import time
+    
+    konec = len(posloupnost) - 3 * delka + 1
+    for i in range(0, konec):
+        if start_time != None and time.time() - start_time >= MAX_TIME:
+            return TIMEOUT;
+        
+        if i in nove_delky:
+            d1 = nove_delky[i]
+        elif stare_delky != None:
+            d1 = stare_delky[i] + posloupnost[i + delka - 1]
+            nove_delky[i] = d1
+        else: # delka = 1
+            d1 = posloupnost[i]
+            nove_delky[i] = d1
+        j = i + delka
+        if j in nove_delky:
+            d2 = nove_delky[j]
+        elif stare_delky != None:
+            d2 = stare_delky[j] + posloupnost[j + delka - 1]
+            nove_delky[j] = d2
+        else: # delka = 1
+            d2 = posloupnost[j]
+            nove_delky[j] = d2
+        k = j + delka
+        if k in nove_delky:
+            d3 = nove_delky[k]
+        elif stare_delky != None:
+            d3 = stare_delky[k] + posloupnost[k + delka - 1]
+            nove_delky[k] = d3
+        else: # delka = 1
+            d3 = posloupnost[k]
+            nove_delky[k] = d3
+        
+        if d1 == d2 == d3:
+            return TRETI_MOCNINA_OK
+
+    return TRETI_MOCNINA_NOK
+
+# pro danou posloupnost zkontroluje vyskyt libovolnych tretich mocnin
+def existuje_3_mocnina(predpis, posloupnost = None):
+    stare_delky, nove_delky = None, {}
+    # pokud zadnou treti mocninu nenajde, vypise danou posloupnost
+    for delka in range(1, len(posloupnost) // 3):
+        if existuje_3_mocnina_pro_delku(posloupnost, delka, stare_delky, nove_delky) == TRETI_MOCNINA_OK:
+            return TRETI_MOCNINA_OK, posloupnost, predpis
+        stare_delky, nove_delky = nove_delky, {}
+    return TRETI_MOCNINA_NOK, posloupnost, predpis
+
+def najdi_bez_3_mocniny(predpis, pocet_iteraci, posloupnost = None, max_time = None):
+    if posloupnost == None:
+        posloupnost = vytvor_posloupnost(predpis, pocet_iteraci)
+
     if max_time == None:
-        return najdi_bez_3_mocniny(predpis, pocet_iteraci)
+        return existuje_3_mocnina(predpis, posloupnost)
     
     try:
-        posloupnost = vytvor_posloupnost(predpis, pocet_iteraci)
         with time_limit(max_time):
-            if existuje_3_mocnina(posloupnost):
-                return None, None
+            return existuje_3_mocnina(predpis, posloupnost)
     except Exception:
         print('Timeout pro ', predpis)
-        return posloupnost, None
+        return TIMEOUT, posloupnost, predpis
     return posloupnost, predpis
 
 def main_sync(cfg, mapa, index = 0, posloupnosti = None):
@@ -212,14 +207,14 @@ def main_sync(cfg, mapa, index = 0, posloupnosti = None):
         print(index, 'abeceda', ABCD[cfg.abeceda], 'mapa', mapa if mapa != None else cfg.mapa)
         predpisy = generuj_predpisy(ABCD[cfg.abeceda], mapa if mapa != None else cfg.mapa)
         print('pocet predpisu', len(predpisy))
-        _vysledky = [najdi_bez_3_mocniny_sync(predpis, cfg.pocet_iteraci, cfg.max_doba_1_zpracovani) for predpis in predpisy]
+        _vysledky = [najdi_bez_3_mocniny(predpis, cfg.pocet_iteraci, cfg.max_doba_1_zpracovani) for predpis in predpisy]
     else:
         print('pocet posloupnosti', len(posloupnosti))
-        _vysledky = [najdi_bez_3_mocniny2(po, pr) for (po, pr) in posloupnosti]
+        _vysledky = [najdi_bez_3_mocniny(pr, None, po, cfg.max_doba_1_zpracovani) for (po, pr) in posloupnosti]
 
-    vysledky = [(po, pr) for (po, pr) in _vysledky if po != None]
+    vysledky = [(st, po, pr) for (st, po, pr) in _vysledky if st == TIMEOUT or st == TRETI_MOCNINA_NOK]
     print('vysledky', len(vysledky))
-    vysledky_ok = [(po, pr) for (po, pr) in vysledky if pr != None]
+    vysledky_ok = [(po, pr) for (st, po, pr) in vysledky if st == TRETI_MOCNINA_NOK]
     print('vysledky_ok', len(vysledky_ok)) #, vysledky_ok)
 
     elapsed_time = time.time() - start_time
@@ -259,47 +254,6 @@ def posloupnosti_sync(cfg):
 
     return posloupnosti
 
-# zkontroluje, zda se v posloupnosti vyskytuji treti aditivni mocniny dane delky
-def existuje_3_mocnina_pro_delku_async(posloupnost, delka, stare_delky, nove_delky, start_time):
-    import time
-    
-    konec = len(posloupnost) - 3 * delka + 1
-    for i in range(0, konec):
-        if time.time() - start_time >= MAX_TIME:
-            return -1;
-        
-        if i in nove_delky:
-            d1 = nove_delky[i]
-        elif stare_delky != None:
-            d1 = stare_delky[i] + posloupnost[i + delka - 1]
-            nove_delky[i] = d1
-        else: # delka = 1
-            d1 = posloupnost[i]
-            nove_delky[i] = d1
-        j = i + delka
-        if j in nove_delky:
-            d2 = nove_delky[j]
-        elif stare_delky != None:
-            d2 = stare_delky[j] + posloupnost[j + delka - 1]
-            nove_delky[j] = d2
-        else: # delka = 1
-            d2 = posloupnost[j]
-            nove_delky[j] = d2
-        k = j + delka
-        if k in nove_delky:
-            d3 = nove_delky[k]
-        elif stare_delky != None:
-            d3 = stare_delky[k] + posloupnost[k + delka - 1]
-            nove_delky[k] = d3
-        else: # delka = 1
-            d3 = posloupnost[k]
-            nove_delky[k] = d3
-        
-        if d1 == d2 == d3:
-            return 1
-
-    return 0
-
 # pro danou posloupnost zkontroluje vyskyt libovolnych tretich mocnin
 def existuje_3_mocnina_async(posloupnost, predpis, start_time):
     import time
@@ -308,82 +262,32 @@ def existuje_3_mocnina_async(posloupnost, predpis, start_time):
     # pokud zadnou treti mocninu nenajde, vypise danou posloupnost
     for delka in range(1, len(posloupnost) // 3):
         if time.time() - start_time >= MAX_TIME:
-            return posloupnost, None
-        rc = existuje_3_mocnina_pro_delku_async(posloupnost, delka, stare_delky, nove_delky, start_time)
-        if rc == 1:
-            return None, None
-        if rc == -1:
-            return posloupnost, None
+            return TIMEOUT, posloupnost, predpis
+        st = existuje_3_mocnina_pro_delku(posloupnost, delka, stare_delky, nove_delky, start_time)
+        if st != TRETI_MOCNINA_NOK:
+            return st, posloupnost, predpis
         stare_delky, nove_delky = nove_delky, {}
-    return posloupnost, predpis
+    return TRETI_MOCNINA_NOK, posloupnost, predpis
 
-# pro danou posloupnost zkontroluje vyskyt libovolnych tretich mocnin
-def existuje_3_mocnina_async2(po_pr):
+def existuje_3_mocnina_async2(posloupnost_predpis):
     import time
 
     start_time = time.time()
-    
-    (posloupnost, predpis) = po_pr
-    
-    stare_delky, nove_delky = None, {}
-    # pokud zadnou treti mocninu nenajde, vypise danou posloupnost
-    for delka in range(1, len(posloupnost) // 3):
-        if time.time() - start_time >= MAX_TIME:
-            return posloupnost, None
-        rc = existuje_3_mocnina_pro_delku_async(posloupnost, delka, stare_delky, nove_delky, start_time)
-        if rc == 1:
-            return None, None
-        if rc == -1:
-            return posloupnost, None
-        stare_delky, nove_delky = nove_delky, {}
-    return posloupnost, predpis
+    (posloupnost, predpis) = posloupnost_predpis
+    return existuje_3_mocnina_async(posloupnost, predpis, start_time)
 
 def najdi_bez_3_mocniny_async(predpis):
     import time
 
     if MAX_TIME == None:
         return najdi_bez_3_mocniny(predpis, POCET_ITERACI)
-
+    
     start_time = time.time()
     posloupnost = vytvor_posloupnost(predpis, POCET_ITERACI)
     if time.time() - start_time >= MAX_TIME:
-        return posloupnost, None
+        return TIMEOUT, posloupnost, predpis
         
     return existuje_3_mocnina_async(posloupnost, predpis, start_time)
-
-# zkontroluje, zda se v posloupnosti vyskytuji treti aditivni mocniny dane delky
-def existuje_3_mocnina_pro_delku_async2(in_po_pr_de):
-    import time
-
-    start_time = time.time()
-    
-    (index, posloupnost, predpis, delka) = in_po_pr_de
-    konec = len(posloupnost) - 3 * delka + 1
-    delky = {}
-    
-    # pokud takovou mocninu najde, ihned skonci a vrati jednicku
-    for i in range(0, konec):
-        if i in delky:
-            d1 = delky[i]
-        else:
-            d1 = secti_usek(posloupnost, i, i + delka)
-            delky[i] = d1
-        j = i + delka
-        if j in delky:
-            d2 = delky[j]
-        else:
-            d2 = secti_usek(posloupnost, j, j + delka)
-            delky[j] = d2
-        k = j + delka
-        if k in delky:
-            d3 = delky[k]
-        else:
-            d3 = secti_usek(posloupnost, k, k + delka)
-            delky[k] = d3
-        
-        if d1 == d2 == d3:
-            return index, posloupnost, None, delka, time.time() - start_time
-    return index, posloupnost, predpis, delka, time.time() - start_time
 
 POCET_ITERACI = None
 MAX_TIME = None
@@ -397,16 +301,17 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
     print(client.ids)
     client[:].push(dict(vytvor_posloupnost = vytvor_posloupnost, 
                         iteruj_posloupnost = iteruj_posloupnost, 
-                        existuje_3_mocnina = existuje_3_mocnina, 
+                        existuje_3_mocnina_pro_delku = existuje_3_mocnina_pro_delku, 
+                        existuje_3_mocnina = existuje_3_mocnina,
+                        najdi_bez_3_mocniny = najdi_bez_3_mocniny,
                         existuje_3_mocnina_async = existuje_3_mocnina_async,
                         existuje_3_mocnina_async2 = existuje_3_mocnina_async2,
-                        existuje_3_mocnina_pro_delku = existuje_3_mocnina_pro_delku,
-                        existuje_3_mocnina_pro_delku_async = existuje_3_mocnina_pro_delku_async,
-                        existuje_3_mocnina_pro_delku_async2 = existuje_3_mocnina_pro_delku_async2,
-                        secti_usek = secti_usek,
-                        najdi_bez_3_mocniny = najdi_bez_3_mocniny,
+                        najdi_bez_3_mocniny_async = najdi_bez_3_mocniny_async,
                         POCET_ITERACI = cfg.pocet_iteraci,
-                        MAX_TIME = cfg.max_doba_1_zpracovani))
+                        MAX_TIME = cfg.max_doba_1_zpracovani, 
+                        TIMEOUT = TIMEOUT,
+                        TRETI_MOCNINA_OK = TRETI_MOCNINA_OK,
+                        TRETI_MOCNINA_NOK = TRETI_MOCNINA_NOK))
 #     view = client.load_balanced_view()
     view = client.load_balanced_view()
     view.block = True
@@ -429,10 +334,10 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
     vysledky_nezpracovane_pocet = 0
     vysledky_nezpracovane = []
     vysledky_ok = {}
-    for ix, (po, pr) in enumerate(_vysledky):
-        if po == None:
+    for ix, (st, po, pr) in enumerate(_vysledky):
+        if st == TRETI_MOCNINA_OK:
             continue
-        if pr != None:
+        if st == TRETI_MOCNINA_NOK:
             vysledky_ok[ix] = (po, pr)
             continue
         vysledky_nezpracovane_pocet += 1
@@ -448,25 +353,25 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
         print('Doba castecneho zpracovani (s)', elapsed_time)
         print('vysledky_nezpracovane', len(vysledky_nezpracovane))
 
-        lvn = len(vysledky_nezpracovane)
-        if lvn <= cfg.max_delka_2_zpracovani:
-            _vysledky2 = []
-            l = 0
-            while l + cfg.max_vzdalenych_ukolu <= lvn:
-                print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu, time.time() - start_time)
-                _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:l + cfg.max_vzdalenych_ukolu]))
-                l += cfg.max_vzdalenych_ukolu
-            print('zpracovavam', l, lvn, time.time() - start_time)
-            _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:lvn]))
-            print('_vysledky2', len(_vysledky2))
-            
-            for (ix, po, pr, de, tm) in _vysledky2:
-                if de == None:
-                    if ix in vysledky_ok:
-                        del vysledky_ok[ix]
-                else:
-                    if not ix in vysledky_ok:
-                        vysledky_ok[ix] = (po, pr)    
+#         lvn = len(vysledky_nezpracovane)
+#         if lvn <= cfg.max_delka_2_zpracovani:
+#             _vysledky2 = []
+#             l = 0
+#             while l + cfg.max_vzdalenych_ukolu <= lvn:
+#                 print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu, time.time() - start_time)
+#                 _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:l + cfg.max_vzdalenych_ukolu]))
+#                 l += cfg.max_vzdalenych_ukolu
+#             print('zpracovavam', l, lvn, time.time() - start_time)
+#             _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:lvn]))
+#             print('_vysledky2', len(_vysledky2))
+#             
+#             for (ix, po, pr, de, tm) in _vysledky2:
+#                 if de == None:
+#                     if ix in vysledky_ok:
+#                         del vysledky_ok[ix]
+#                 else:
+#                     if not ix in vysledky_ok:
+#                         vysledky_ok[ix] = (po, pr)    
                         
     print('vysledky_ok', len(vysledky_ok)) #, vysledky_ok)
     for (po, pr) in vysledky_ok.values():
@@ -598,6 +503,8 @@ if __name__ == '__main__':
         else:
             posloupnosti = posloupnosti_sync(cfg)
         if cfg.async_zpracovani:
+            if cfg.max_doba_1_zpracovani == None:
+                cfg.max_doba_1_zpracovani = 5
             vysledky.extend(main_async(cfg, None, None, posloupnosti))
         else:
             vysledky.extend(main_sync(cfg, None, None, posloupnosti))
