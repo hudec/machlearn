@@ -455,34 +455,44 @@ def posloupnosti_async(cfg):
                         iteruj_posloupnost = iteruj_posloupnost, 
                         POCET_ITERACI = cfg.pocet_iteraci))
 
-#     view = client.load_balanced_view()
-#     view.block = True
-#     posloupnosti = []
-#     l = 0
-#     while l < lpr:
-#         print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
-#         posloupnosti.extend(view.map(vytvor_posloupnost_async, predpisy[l:l + cfg.max_vzdalenych_ukolu]))
-#         l += cfg.max_vzdalenych_ukolu
+    if not cfg.scatter:
+        view = client.load_balanced_view()
+        view.block = True
+        posloupnosti = []
+        lpr = len(predpisy)
+        l = 0
+        while l < lpr:
+            print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
+            posloupnosti.extend(view.map(vytvor_posloupnost_async, predpisy[l:l + cfg.max_vzdalenych_ukolu]))
+            l += cfg.max_vzdalenych_ukolu
+        _posloupnosti = set()
+        posloupnosti_ok = []
+        for (po, pr) in posloupnosti: 
+            _po = '-'.join(map(str, po))
+            if not _po in _posloupnosti:
+                posloupnosti_ok.append((po, pr))
+                _posloupnosti.add(_po)
 
-    dview = client[:]
-    dview.block = True
-    _posloupnosti = set()
-    posloupnosti_ok = []
-    lpr = len(predpisy)
-    l = 0
-    while l < lpr:
-        print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
-        dview.scatter('PREDPISY', predpisy[l:l + cfg.max_vzdalenych_ukolu])
-        ar = dview.apply(vytvor_posloupnosti_async)
-        for posloupnosti in ar:
-            for (po, pr) in posloupnosti: 
-                _po = '-'.join(map(str, po))
-                if not _po in _posloupnosti:
-                    posloupnosti_ok.append((po, pr))
-                    _posloupnosti.add(_po)
-        l += cfg.max_vzdalenych_ukolu
+    else:
+        dview = client[:]
+        dview.block = True
+        _posloupnosti = set()
+        posloupnosti_ok = []
+        lpr = len(predpisy)
+        l = 0
+        while l < lpr:
+            print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
+            dview.scatter('PREDPISY', predpisy[l:l + cfg.max_vzdalenych_ukolu])
+            ar = dview.apply(vytvor_posloupnosti_async)
+            for posloupnosti in ar:
+                for (po, pr) in posloupnosti: 
+                    _po = '-'.join(map(str, po))
+                    if not _po in _posloupnosti:
+                        posloupnosti_ok.append((po, pr))
+                        _posloupnosti.add(_po)
+            l += cfg.max_vzdalenych_ukolu
+            
     print('pocet posloupnosti', len(posloupnosti_ok))
-
     elapsed_time = time.time() - start_time
     print('Doba castecneho zpracovani (s)', elapsed_time)
 
@@ -502,6 +512,7 @@ class Config:
         self.default_generuj_posloupnosti = False
         self.default_async_generuj_posloupnosti = False
         self.default_soubor_posloupnosti = None
+        self.default_scatter = True
         
         parser = argparse.ArgumentParser(description='Generovani posloupnosti bez tretich mocnin.')
         parser.add_argument('-i', '--iter', type=int, dest = 'pocet_iteraci', default = self.default_pocet_iteraci,
@@ -528,6 +539,8 @@ class Config:
                             help='index abecedy [0, 1, 3, 4], [0, 1, 3, 6], [0, 1, 5, 8]')
         parser.add_argument('-s', '--soubor', dest = 'soubor_posloupnosti', default = self.default_soubor_posloupnosti,
                             help='uloz nebo nacti posloupnosti do/ze souboru)')
+        parser.add_argument('-S', '--scatter', dest = 'scatter', default = self.default_scatter, action='store_true',
+                            help='pouzij scatter')
         parser.parse_args(namespace = self)
 
 def main(cfg, mapa = None, index = 0):
@@ -545,7 +558,7 @@ if __name__ == '__main__':
     
     if cfg.generuj_posloupnosti or cfg.async_generuj_posloupnosti:
         
-        if os.path.exists(cfg.soubor_posloupnosti):
+        if cfg.soubor_posloupnosti and os.path.exists(cfg.soubor_posloupnosti):
             print('nacitam posloupnosti z', cfg.soubor_posloupnosti)
             with open(cfg.soubor_posloupnosti, 'rb') as soubor_posloupnosti:
                 posloupnosti = pickle.load(soubor_posloupnosti)
