@@ -231,6 +231,7 @@ def main_sync(cfg, mapa, index = 0, posloupnosti = None):
     return vysledky_ok
 
 def posloupnosti_sync(cfg):
+    start_time = time.time()
 
     print('abeceda', ABCD)
     predpisy = []
@@ -254,6 +255,9 @@ def posloupnosti_sync(cfg):
             posloupnosti.append((po, pr))
             _posloupnosti.add(_po)
     print('pocet posloupnosti', len(posloupnosti))
+
+    elapsed_time = time.time() - start_time
+    print('Doba zpracovani (s)', elapsed_time)
 
     return posloupnosti
 
@@ -466,7 +470,7 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
                     if not ix in vysledky_ok:
                         vysledky_ok[ix] = (po, pr)    
                         
-    print('vysledky_ok', len(vysledky_ok), vysledky_ok)
+    print('vysledky_ok', len(vysledky_ok)) #, vysledky_ok)
     for (po, pr) in vysledky_ok.values():
         print(len(po))
 
@@ -478,7 +482,15 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
 def vytvor_posloupnost_async(predpis):
     return (vytvor_posloupnost(predpis, POCET_ITERACI), predpis)
 
+PREDPISY = None
+def vytvor_posloupnosti_async():
+    posloupnosti = []
+    for predpis in PREDPISY:
+        posloupnosti.append(vytvor_posloupnost_async(predpis))
+    return posloupnosti
+
 def posloupnosti_async(cfg):
+    start_time = time.time()
 
     client = ipp.Client(profile = cfg.async_profil)
     client[:].block = True
@@ -501,24 +513,32 @@ def posloupnosti_async(cfg):
                         vytvor_posloupnost = vytvor_posloupnost, 
                         iteruj_posloupnost = iteruj_posloupnost, 
                         POCET_ITERACI = cfg.pocet_iteraci))
-    view = client.load_balanced_view()
-    view.block = True
-
-    posloupnosti = []
-    l = 0
-    while l + cfg.max_vzdalenych_ukolu <= lpr:
-        print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
-        posloupnosti.extend(view.map(vytvor_posloupnost_async, predpisy[l:l + cfg.max_vzdalenych_ukolu]))
-        l += cfg.max_vzdalenych_ukolu
-            
+#     view = client.load_balanced_view()
+#     view.block = True
+# 
+#     posloupnosti = []
+#     l = 0
+#     while l + cfg.max_vzdalenych_ukolu <= lpr:
+#         print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
+#         posloupnosti.extend(view.map(vytvor_posloupnost_async, predpisy[l:l + cfg.max_vzdalenych_ukolu]))
+#         l += cfg.max_vzdalenych_ukolu
+    dview = client[:]
+    dview.block = True
+    dview.scatter('PREDPISY', predpisy)
+    ar = dview.apply(vytvor_posloupnosti_async)
+    
     _posloupnosti = set()
     posloupnosti_ok = []
-    for (po, pr) in posloupnosti: 
-        _po = '-'.join(map(str, po))
-        if not _po in _posloupnosti:
-            posloupnosti_ok.append((po, pr))
-            _posloupnosti.add(_po)
+    for posloupnosti in ar:
+        for (po, pr) in posloupnosti: 
+            _po = '-'.join(map(str, po))
+            if not _po in _posloupnosti:
+                posloupnosti_ok.append((po, pr))
+                _posloupnosti.add(_po)
     print('pocet posloupnosti', len(posloupnosti_ok))
+
+    elapsed_time = time.time() - start_time
+    print('Doba castecneho zpracovani (s)', elapsed_time)
 
     return posloupnosti_ok
 
