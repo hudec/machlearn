@@ -174,6 +174,44 @@ def existuje_3_mocnina_pro_delku(posloupnost, delka, stare_delky, nove_delky, st
 
     return TRETI_MOCNINA_NOK
 
+# secte dany usek posloupnosti
+def secti_usek(posloupnost, c1, c2):
+    soucet = 0
+    for i in range(c1, c2):
+        soucet = soucet + posloupnost[i]
+    return soucet      
+
+# zkontroluje, zda se v posloupnosti vyskytuji treti aditivni mocniny dane delky
+def existuje_3_mocnina_pro_delku_async2(in_po_pr_de):
+    
+    (index, posloupnost, predpis, delka) = in_po_pr_de
+    konec = len(posloupnost) - 3 * delka + 1
+    delky = {}
+    
+    # pokud takovou mocninu najde, ihned skonci a vrati jednicku
+    for i in range(0, konec):
+        if i in delky:
+            d1 = delky[i]
+        else:
+            d1 = secti_usek(posloupnost, i, i + delka)
+            delky[i] = d1
+        j = i + delka
+        if j in delky:
+            d2 = delky[j]
+        else:
+            d2 = secti_usek(posloupnost, j, j + delka)
+            delky[j] = d2
+        k = j + delka
+        if k in delky:
+            d3 = delky[k]
+        else:
+            d3 = secti_usek(posloupnost, k, k + delka)
+            delky[k] = d3
+        
+        if d1 == d2 == d3:
+            return TRETI_MOCNINA_OK, index, posloupnost, delka, delka
+    return TRETI_MOCNINA_NOK, index, posloupnost, predpis, delka
+
 # pro danou posloupnost zkontroluje vyskyt libovolnych tretich mocnin
 def existuje_3_mocnina(predpis, posloupnost = None):
     stare_delky, nove_delky = None, {}
@@ -306,6 +344,8 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
                         existuje_3_mocnina_async = existuje_3_mocnina_async,
                         existuje_3_mocnina_async2 = existuje_3_mocnina_async2,
                         najdi_bez_3_mocniny_async = najdi_bez_3_mocniny_async,
+                        secti_usek = secti_usek,
+                        existuje_3_mocnina_pro_delku_async2 = existuje_3_mocnina_pro_delku_async2,
                         POCET_ITERACI = cfg.pocet_iteraci,
                         MAX_TIME = cfg.max_doba_1_zpracovani, 
                         TIMEOUT = TIMEOUT,
@@ -326,7 +366,7 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
         _vysledky = []
         l = 0
         while l < lpo:
-            print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
+            print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu, time.time() - start_time)
             _vysledky.extend(view.map(existuje_3_mocnina_async2, posloupnosti[l:l + cfg.max_vzdalenych_ukolu]))
             l += cfg.max_vzdalenych_ukolu
     
@@ -343,7 +383,6 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
         print('len(po) // 3', len(po) // 3)
         for delka in range(1, (len(po) // 3) + 1):
             vysledky_nezpracovane.append((ix, po, pr, delka))
-#         vysledky_nezpracovane.append((po, predpisy[ix]))
     
     if len(vysledky_nezpracovane) > 0:    
         print('vysledky (pozitivni)', len(vysledky_ok))
@@ -352,25 +391,25 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
         print('Doba castecneho zpracovani (s)', elapsed_time)
         print('vysledky_nezpracovane', len(vysledky_nezpracovane))
 
-#         lvn = len(vysledky_nezpracovane)
-#         if lvn <= cfg.max_delka_2_zpracovani:
-#             _vysledky2 = []
-#             l = 0
-#             while l + cfg.max_vzdalenych_ukolu <= lvn:
-#                 print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu, time.time() - start_time)
-#                 _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:l + cfg.max_vzdalenych_ukolu]))
-#                 l += cfg.max_vzdalenych_ukolu
-#             print('zpracovavam', l, lvn, time.time() - start_time)
-#             _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:lvn]))
-#             print('_vysledky2', len(_vysledky2))
-#             
-#             for (ix, po, pr, de, tm) in _vysledky2:
-#                 if de == None:
-#                     if ix in vysledky_ok:
-#                         del vysledky_ok[ix]
-#                 else:
-#                     if not ix in vysledky_ok:
-#                         vysledky_ok[ix] = (po, pr)    
+        lvn = len(vysledky_nezpracovane)
+        if lvn <= cfg.max_delka_2_zpracovani:
+            _vysledky2 = []
+            l = 0
+            while l < lvn:
+                print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu, time.time() - start_time)
+                _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:l + cfg.max_vzdalenych_ukolu]))
+                l += cfg.max_vzdalenych_ukolu
+            print('_vysledky2', len(_vysledky2))
+             
+            for (ix, st, po, pr, de) in _vysledky2:
+                if st == TRETI_MOCNINA_OK:
+                    if ix in vysledky_ok:
+                        print('mazu', ix)
+                        del vysledky_ok[ix]
+                else:
+                    if not ix in vysledky_ok:
+                        vysledky_ok[ix] = (po, pr)    
+                        print('pridavam', ix)
                         
     print('vysledky_ok', len(vysledky_ok)) #, vysledky_ok)
     for (po, pr) in vysledky_ok.values():
@@ -456,7 +495,7 @@ class Config:
         self.default_async_zpracovani = False
         self.default_max_doba_1_zpracovani = None
         self.default_max_vzdalenych_ukolu = 1024
-        self.default_max_delka_2_zpracovani = 10000
+        self.default_max_delka_2_zpracovani = 20000
         self.default_abeceda = 0
         self.default_mapa = [0, 2, 1, 3]
         self.default_permutace = False
