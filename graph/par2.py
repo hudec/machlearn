@@ -1,8 +1,7 @@
 import ipyparallel as ipp
 #from timeit import default_timer as clock
-import sys, time, argparse, signal, itertools
+import sys, time, argparse, signal, itertools, pickle, os.path
 from contextlib import contextmanager
-#from graph.seq1 import predpisy
 
 class TimeoutException(Exception): pass
 
@@ -326,7 +325,7 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
         print('pocet posloupnosti', lpo)
         _vysledky = []
         l = 0
-        while l + cfg.max_vzdalenych_ukolu <= lpo:
+        while l < lpo:
             print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
             _vysledky.extend(view.map(existuje_3_mocnina_async2, posloupnosti[l:l + cfg.max_vzdalenych_ukolu]))
             l += cfg.max_vzdalenych_ukolu
@@ -343,7 +342,7 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
         vysledky_nezpracovane_pocet += 1
         print('len(po) // 3', len(po) // 3)
         for delka in range(1, (len(po) // 3) + 1):
-            vysledky_nezpracovane.append((ix, po, predpisy[ix], delka))
+            vysledky_nezpracovane.append((ix, po, pr, delka))
 #         vysledky_nezpracovane.append((po, predpisy[ix]))
     
     if len(vysledky_nezpracovane) > 0:    
@@ -416,28 +415,33 @@ def posloupnosti_async(cfg):
                         vytvor_posloupnost = vytvor_posloupnost, 
                         iteruj_posloupnost = iteruj_posloupnost, 
                         POCET_ITERACI = cfg.pocet_iteraci))
+
 #     view = client.load_balanced_view()
 #     view.block = True
-# 
 #     posloupnosti = []
 #     l = 0
-#     while l + cfg.max_vzdalenych_ukolu <= lpr:
+#     while l < lpr:
 #         print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
 #         posloupnosti.extend(view.map(vytvor_posloupnost_async, predpisy[l:l + cfg.max_vzdalenych_ukolu]))
 #         l += cfg.max_vzdalenych_ukolu
+
     dview = client[:]
     dview.block = True
-    dview.scatter('PREDPISY', predpisy)
-    ar = dview.apply(vytvor_posloupnosti_async)
-    
     _posloupnosti = set()
     posloupnosti_ok = []
-    for posloupnosti in ar:
-        for (po, pr) in posloupnosti: 
-            _po = '-'.join(map(str, po))
-            if not _po in _posloupnosti:
-                posloupnosti_ok.append((po, pr))
-                _posloupnosti.add(_po)
+    lpr = len(predpisy)
+    l = 0
+    while l < lpr:
+        print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu)
+        dview.scatter('PREDPISY', predpisy[l:l + cfg.max_vzdalenych_ukolu])
+        ar = dview.apply(vytvor_posloupnosti_async)
+        for posloupnosti in ar:
+            for (po, pr) in posloupnosti: 
+                _po = '-'.join(map(str, po))
+                if not _po in _posloupnosti:
+                    posloupnosti_ok.append((po, pr))
+                    _posloupnosti.add(_po)
+        l += cfg.max_vzdalenych_ukolu
     print('pocet posloupnosti', len(posloupnosti_ok))
 
     elapsed_time = time.time() - start_time
@@ -458,6 +462,7 @@ class Config:
         self.default_permutace = False
         self.default_generuj_posloupnosti = False
         self.default_async_generuj_posloupnosti = False
+        self.default_soubor_posloupnosti = None
         
         parser = argparse.ArgumentParser(description='Generovani posloupnosti bez tretich mocnin.')
         parser.add_argument('-i', '--iter', type=int, dest = 'pocet_iteraci', default = self.default_pocet_iteraci,
@@ -482,6 +487,8 @@ class Config:
                             help='generuje pro vsechny mapy a predpisy jednu mnozinu posloupnosti asynchronne')
         parser.add_argument('-A', '--abcd', type=int, dest = 'abeceda', default = self.default_abeceda,
                             help='index abecedy [0, 1, 3, 4], [0, 1, 3, 6], [0, 1, 5, 8]')
+        parser.add_argument('-s', '--soubor', dest = 'soubor_posloupnosti', default = self.default_soubor_posloupnosti,
+                            help='uloz nebo nacti posloupnosti do/ze souboru)')
         parser.parse_args(namespace = self)
 
 def main(cfg, mapa = None, index = 0):
@@ -498,10 +505,23 @@ if __name__ == '__main__':
     vysledky = []
     
     if cfg.generuj_posloupnosti or cfg.async_generuj_posloupnosti:
-        if cfg.async_generuj_posloupnosti:
-            posloupnosti = posloupnosti_async(cfg)
+        
+        if os.path.exists(cfg.soubor_posloupnosti):
+            print('nacitam posloupnosti z', cfg.soubor_posloupnosti)
+            with open(cfg.soubor_posloupnosti, 'rb') as soubor_posloupnosti:
+                posloupnosti = pickle.load(soubor_posloupnosti)
+        
         else:
-            posloupnosti = posloupnosti_sync(cfg)
+            if cfg.async_generuj_posloupnosti:
+                posloupnosti = posloupnosti_async(cfg)
+            else:
+                posloupnosti = posloupnosti_sync(cfg)
+            
+            if cfg.soubor_posloupnosti:
+                print('ukladam posloupnosti do', cfg.soubor_posloupnosti)
+                with open(cfg.soubor_posloupnosti, 'wb') as soubor_posloupnosti:
+                    pickle.dump(posloupnosti, soubor_posloupnosti, protocol=4)
+        
         if cfg.async_zpracovani:
             if cfg.max_doba_1_zpracovani == None:
                 cfg.max_doba_1_zpracovani = 5
