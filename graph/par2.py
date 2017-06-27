@@ -513,6 +513,7 @@ class Config:
         self.default_async_generuj_posloupnosti = False
         self.default_soubor_posloupnosti = None
         self.default_scatter = True
+        self.default_soubor_vysledky = None
         
         parser = argparse.ArgumentParser(description='Generovani posloupnosti bez tretich mocnin.')
         parser.add_argument('-i', '--iter', type=int, dest = 'pocet_iteraci', default = self.default_pocet_iteraci,
@@ -541,6 +542,8 @@ class Config:
                             help='uloz nebo nacti posloupnosti do/ze souboru)')
         parser.add_argument('-S', '--scatter', dest = 'scatter', default = self.default_scatter, action='store_true',
                             help='pouzij scatter')
+        parser.add_argument('-U', '--uloz', dest = 'soubor_vysledky', default = self.default_soubor_vysledky,
+                            help='uloz nalezene posloupnosti do souboru')
         parser.parse_args(namespace = self)
 
 def main(cfg, mapa = None, index = 0):
@@ -590,6 +593,10 @@ if __name__ == '__main__':
                 vysledky.extend(main(cfg, mapa, index))
         else:
             vysledky.extend(main(cfg))
+            
+        if cfg.soubor_vysledky:
+            with open(cfg.soubor_vysledky, 'wb') as soubor_vysledky:
+                pickle.dump(vysledky, soubor_vysledky, protocol=4)
     
         print('VYSLEDKY, POCET', len(vysledky))
         _vysledky = set()
