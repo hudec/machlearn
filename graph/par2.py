@@ -589,10 +589,10 @@ def main_zpracovani(cfg, mapa = None, index = 0, posloupnosti = None):
     else:
         return main_sync(cfg, mapa, index, posloupnosti)
 
-def main_abeceda(cfg, abcd):
+def main_abeceda(cfg):
     start_time = time.time()
 
-    print(ABCD[abcd])    
+    print(ABCD[cfg.abeceda])    
     posloupnosti = None
     vysledky = []
     
@@ -631,10 +631,13 @@ def main_abeceda(cfg, abcd):
     print('Doba zpracovani (s)', elapsed_time)
                 
 if __name__ == '__main__':
+    start_time = time.time()
     cfg = Config()
     if cfg.abeceda == 0:
         for abcd in range(0, len(ABCD)):
-            main_abeceda(cfg, abcd)
+            cfg.abeceda = abcd
+            main_abeceda(cfg)
     else:
-            main_abeceda(cfg, cfg.abeceda - 1)
-        
+            main_abeceda(cfg)
+    elapsed_time = time.time() - start_time
+    print('Celkova oba zpracovani (s)', elapsed_time)
