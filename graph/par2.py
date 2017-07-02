@@ -62,6 +62,33 @@ def clear_prof_data():
 
 ABCD  = [[0, 1, 3, 4], [0, 1, 3, 6], [0, 1, 5, 8]]
 
+SOUBOR_POSLOUPNOST = 1
+SOUBOR_VYSLEDKY = 2
+SOUBOR_NEZPRACOVANE = 3
+
+def jmeno_souboru(cfg, typ):
+    zaklad = '-'.join(map(str, ABCD[cfg.abeceda]))
+    if typ == SOUBOR_POSLOUPNOST and cfg.soubor_posloupnosti:
+        return zaklad + '.' + cfg.soubor_posloupnosti
+    if typ == SOUBOR_VYSLEDKY and cfg.default_soubor_vysledky:
+        return zaklad + '.' + cfg.default_soubor_vysledky
+    if typ == SOUBOR_NEZPRACOVANE and cfg.default_soubor_vysledky:
+        return zaklad + '.' + cfg.default_soubor_vysledky
+    return None
+
+def nacti_soubor(cfg, typ):
+    jmeno = jmeno_souboru(cfg, typ)
+    if jmeno and os.path.exists(jmeno):
+        with open(jmeno, 'rb') as soubor:
+            return pickle.load(soubor)
+    return None
+
+def zapis_soubor(cfg, typ, data):
+    jmeno = jmeno_souboru(cfg, typ)
+    if jmeno:
+        with open(jmeno, 'wb') as soubor:
+            pickle.dump(data, soubor, protocol=4)
+
 # PREDPIS = {0 : [0, 3], 1 : [4, 3], 3 : [1], 4: [0, 1]}
 # print(vytvor_posloupnost(5, PREDPIS))
 # posloupnost_12 = vytvor_posloupnost(12, PREDPIS)
@@ -395,9 +422,7 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
         print('Doba castecneho zpracovani (s)', elapsed_time)
         print('vysledky_nezpracovane_delky', len(vysledky_nezpracovane_delky))
 
-        if cfg.soubor_vysledky:
-            with open(cfg.soubor_vysledky + ".nezpracovane", 'wb') as soubor_vysledky:
-                pickle.dump(vysledky_nezpracovane, soubor_vysledky, protocol=4)
+        zapis_soubor(cfg, SOUBOR_NEZPRACOVANE, vysledky_nezpracovane)
 
         lvn = len(vysledky_nezpracovane_delky)
         if lvn <= cfg.max_delka_2_zpracovani:
@@ -569,21 +594,13 @@ if __name__ == '__main__':
     
     if cfg.generuj_posloupnosti or cfg.async_generuj_posloupnosti:
         
-        if cfg.soubor_posloupnosti and os.path.exists(cfg.soubor_posloupnosti):
-            print('nacitam posloupnosti z', cfg.soubor_posloupnosti)
-            with open(cfg.soubor_posloupnosti, 'rb') as soubor_posloupnosti:
-                posloupnosti = pickle.load(soubor_posloupnosti)
-        
-        else:
+        posloupnosti = nacti_soubor(cfg, SOUBOR_POSLOUPNOST)
+        if posloupnosti == None:
             if cfg.async_generuj_posloupnosti:
                 posloupnosti = posloupnosti_async(cfg)
             else:
                 posloupnosti = posloupnosti_sync(cfg)
-            
-            if cfg.soubor_posloupnosti:
-                print('ukladam posloupnosti do', cfg.soubor_posloupnosti)
-                with open(cfg.soubor_posloupnosti, 'wb') as soubor_posloupnosti:
-                    pickle.dump(posloupnosti, soubor_posloupnosti, protocol=4)
+            zapis_soubor(cfg, SOUBOR_POSLOUPNOST, posloupnosti)
         
         if cfg.async_zpracovani:
             if cfg.max_doba_1_zpracovani == None:
@@ -609,9 +626,7 @@ if __name__ == '__main__':
             jednoznacne_vysledky.add('-'.join(map(str, po))) 
 
     print('VYSLEDKY, POCET JEDNOZNACNY', len(jednoznacne_vysledky))
-    if cfg.soubor_vysledky:
-        with open(cfg.soubor_vysledky, 'wb') as soubor_vysledky:
-            pickle.dump(vysledky, soubor_vysledky, protocol=4)
+    zapis_soubor(cfg, SOUBOR_VYSLEDKY, jednoznacne_vysledky)
 
     elapsed_time = time.time() - start_time
     print('Doba zpracovani (s)', elapsed_time)
