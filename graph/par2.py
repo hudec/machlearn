@@ -244,12 +244,12 @@ def main_sync(cfg, mapa, index = 0, posloupnosti = None):
         print(index, 'abeceda', ABCD[cfg.abeceda], 'mapa', mapa if mapa != None else cfg.mapa)
         predpisy = generuj_predpisy(ABCD[cfg.abeceda], mapa if mapa != None else cfg.mapa)
         print('pocet predpisu', len(predpisy))
-        _vysledky = [najdi_bez_3_mocniny(predpis, cfg.pocet_iteraci, cfg.max_doba_1_zpracovani) for predpis in predpisy]
+        jednoznacne_vysledky = [najdi_bez_3_mocniny(predpis, cfg.pocet_iteraci, cfg.max_doba_1_zpracovani) for predpis in predpisy]
     else:
         print('pocet posloupnosti', len(posloupnosti))
-        _vysledky = [najdi_bez_3_mocniny(pr, None, po, cfg.max_doba_1_zpracovani) for (po, pr) in posloupnosti]
+        jednoznacne_vysledky = [najdi_bez_3_mocniny(pr, None, po, cfg.max_doba_1_zpracovani) for (po, pr) in posloupnosti]
 
-    vysledky = [(st, po, pr) for (st, po, pr) in _vysledky if st == TIMEOUT or st == TRETI_MOCNINA_NOK]
+    vysledky = [(st, po, pr) for (st, po, pr) in jednoznacne_vysledky if st == TIMEOUT or st == TRETI_MOCNINA_NOK]
     print('vysledky', len(vysledky))
     vysledky_ok = [(po, pr) for (st, po, pr) in vysledky if st == TRETI_MOCNINA_NOK]
     print('vysledky_ok', len(vysledky_ok)) #, vysledky_ok)
@@ -298,13 +298,14 @@ def existuje_3_mocnina_async(posloupnost, predpis, start_time):
     stare_delky, nove_delky = None, {}
     # pokud zadnou treti mocninu nenajde, vypise danou posloupnost
     for delka in range(1, len(posloupnost) // 3):
-        if time.time() - start_time >= MAX_TIME:
-            return TIMEOUT, posloupnost, predpis
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= MAX_TIME:
+            return TIMEOUT, posloupnost, predpis, elapsed_time
         st = existuje_3_mocnina_pro_delku(posloupnost, delka, stare_delky, nove_delky, start_time)
         if st != TRETI_MOCNINA_NOK:
-            return st, posloupnost, predpis
+            return st, posloupnost, predpis, time.time() - start_time
         stare_delky, nove_delky = nove_delky, {}
-    return TRETI_MOCNINA_NOK, posloupnost, predpis
+    return TRETI_MOCNINA_NOK, posloupnost, predpis, time.time() - start_time
 
 def existuje_3_mocnina_async2(posloupnost_predpis):
     import time
@@ -321,8 +322,9 @@ def najdi_bez_3_mocniny_async(predpis):
     
     start_time = time.time()
     posloupnost = vytvor_posloupnost(predpis, POCET_ITERACI)
-    if time.time() - start_time >= MAX_TIME:
-        return TIMEOUT, posloupnost, predpis
+    elapsed_time = time.time() - start_time
+    if elapsed_time >= MAX_TIME:
+        return TIMEOUT, posloupnost, predpis, elapsed_time
         
     return existuje_3_mocnina_async(posloupnost, predpis, start_time)
 
@@ -359,45 +361,51 @@ def main_async(cfg, mapa = None, index = 0, posloupnosti = None):
         print(index, 'abeceda', ABCD[cfg.abeceda], 'mapa', mapa if mapa != None else cfg.mapa)
         predpisy = generuj_predpisy(ABCD[cfg.abeceda], mapa if mapa != None else cfg.mapa)
         print('pocet predpisu', len(predpisy))
-        _vysledky = view.map(najdi_bez_3_mocniny_async, predpisy)
+        jednoznacne_vysledky = view.map(najdi_bez_3_mocniny_async, predpisy)
     else:
         lpo = len(posloupnosti)
         print('pocet posloupnosti', lpo)
-        _vysledky = []
+        jednoznacne_vysledky = []
         l = 0
         while l < lpo:
             print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu, time.time() - start_time)
-            _vysledky.extend(view.map(existuje_3_mocnina_async2, posloupnosti[l:l + cfg.max_vzdalenych_ukolu]))
+            jednoznacne_vysledky.extend(view.map(existuje_3_mocnina_async2, posloupnosti[l:l + cfg.max_vzdalenych_ukolu]))
             l += cfg.max_vzdalenych_ukolu
     
     vysledky_nezpracovane_pocet = 0
     vysledky_nezpracovane = []
+    vysledky_nezpracovane_delky = []
     vysledky_ok = {}
-    for ix, (st, po, pr) in enumerate(_vysledky):
+    for ix, (st, po, pr, tm) in enumerate(jednoznacne_vysledky):
         if st == TRETI_MOCNINA_OK:
             continue
         if st == TRETI_MOCNINA_NOK:
             vysledky_ok[ix] = (po, pr)
             continue
         vysledky_nezpracovane_pocet += 1
-        print('len(po) // 3', len(po) // 3, ix)
+        print('len(po) // 3', len(po) // 3, ix, tm)
+        vysledky_nezpracovane.append((ix, po, pr))
         for delka in range(1, (len(po) // 3) + 1):
-            vysledky_nezpracovane.append((ix, po, pr, delka))
+            vysledky_nezpracovane_delky.append((ix, po, pr, delka))
     
-    if len(vysledky_nezpracovane) > 0:    
+    if len(vysledky_nezpracovane_delky) > 0:    
         print('vysledky (pozitivni)', len(vysledky_ok))
         print('vysledky (nezpracovane)', vysledky_nezpracovane_pocet)
         elapsed_time = time.time() - start_time
         print('Doba castecneho zpracovani (s)', elapsed_time)
-        print('vysledky_nezpracovane', len(vysledky_nezpracovane))
+        print('vysledky_nezpracovane_delky', len(vysledky_nezpracovane_delky))
 
-        lvn = len(vysledky_nezpracovane)
+        if cfg.soubor_vysledky:
+            with open(cfg.soubor_vysledky + ".nezpracovane", 'wb') as soubor_vysledky:
+                pickle.dump(vysledky_nezpracovane, soubor_vysledky, protocol=4)
+
+        lvn = len(vysledky_nezpracovane_delky)
         if lvn <= cfg.max_delka_2_zpracovani:
             _vysledky2 = []
             l = 0
             while l < lvn:
                 print('zpracovavam', l, l + cfg.max_vzdalenych_ukolu, time.time() - start_time)
-                _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane[l:l + cfg.max_vzdalenych_ukolu]))
+                _vysledky2.extend(view.map(existuje_3_mocnina_pro_delku_async2, vysledky_nezpracovane_delky[l:l + cfg.max_vzdalenych_ukolu]))
                 l += cfg.max_vzdalenych_ukolu
             print('_vysledky2', len(_vysledky2))
              
@@ -584,6 +592,7 @@ if __name__ == '__main__':
         else:
             vysledky.extend(main_sync(cfg, None, None, posloupnosti))
         print('VYSLEDKY, POCET', len(vysledky))
+        jednoznacne_vysledky = vysledky
     
     else:
         if cfg.permutace:
@@ -594,15 +603,15 @@ if __name__ == '__main__':
         else:
             vysledky.extend(main(cfg))
             
-        if cfg.soubor_vysledky:
-            with open(cfg.soubor_vysledky, 'wb') as soubor_vysledky:
-                pickle.dump(vysledky, soubor_vysledky, protocol=4)
-    
         print('VYSLEDKY, POCET', len(vysledky))
-        _vysledky = set()
+        jednoznacne_vysledky = set()
         for (po, pr) in vysledky:
-            _vysledky.add('-'.join(map(str, po))) 
-        print('VYSLEDKY, POCET JEDNOZNACNY', len(_vysledky))
+            jednoznacne_vysledky.add('-'.join(map(str, po))) 
+
+    print('VYSLEDKY, POCET JEDNOZNACNY', len(jednoznacne_vysledky))
+    if cfg.soubor_vysledky:
+        with open(cfg.soubor_vysledky, 'wb') as soubor_vysledky:
+            pickle.dump(vysledky, soubor_vysledky, protocol=4)
 
     elapsed_time = time.time() - start_time
     print('Doba zpracovani (s)', elapsed_time)
