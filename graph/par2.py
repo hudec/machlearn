@@ -581,16 +581,18 @@ class Config:
                             help='uloz nalezene posloupnosti do souboru')
         parser.parse_args(namespace = self)
 
-def main(cfg, mapa = None, index = 0):
+def main_zpracovani(cfg, mapa = None, index = 0, posloupnosti = None):
     if cfg.async_zpracovani:
-        return main_async(cfg, mapa, index)
+        if cfg.max_doba_1_zpracovani == None:
+            cfg.max_doba_1_zpracovani = 5
+        return main_async(cfg, mapa, index, posloupnosti)
     else:
-        return main_sync(cfg, mapa, index)
-                
-if __name__ == '__main__':
+        return main_sync(cfg, mapa, index, posloupnosti)
+
+def main_abeceda(cfg, abcd):
     start_time = time.time()
-    
-    cfg = Config()
+
+    print(ABCD[abcd])    
     posloupnosti = None
     vysledky = []
     
@@ -604,12 +606,7 @@ if __name__ == '__main__':
                 posloupnosti = posloupnosti_sync(cfg)
             zapis_soubor(cfg, SOUBOR_POSLOUPNOST, posloupnosti)
         
-        if cfg.async_zpracovani:
-            if cfg.max_doba_1_zpracovani == None:
-                cfg.max_doba_1_zpracovani = 5
-            vysledky.extend(main_async(cfg, None, None, posloupnosti))
-        else:
-            vysledky.extend(main_sync(cfg, None, None, posloupnosti))
+        vysledky.extend(main_zpracovani(cfg, None, None, posloupnosti))
         print('VYSLEDKY, POCET', len(vysledky))
         jednoznacne_vysledky = vysledky
     
@@ -618,9 +615,9 @@ if __name__ == '__main__':
             permutace = list(itertools.permutations(cfg.mapa))
             print('pocet permutaci', len(permutace))
             for index, mapa in enumerate(permutace):
-                vysledky.extend(main(cfg, mapa, index))
+                vysledky.extend(main_zpracovani(cfg, mapa, index))
         else:
-            vysledky.extend(main(cfg))
+            vysledky.extend(main_zpracovani(cfg))
             
         print('VYSLEDKY, POCET', len(vysledky))
         jednoznacne_vysledky = set()
@@ -632,3 +629,12 @@ if __name__ == '__main__':
 
     elapsed_time = time.time() - start_time
     print('Doba zpracovani (s)', elapsed_time)
+                
+if __name__ == '__main__':
+    cfg = Config()
+    if cfg.abeceda == 0:
+        for abcd in range(0, len(ABCD)):
+            main_abeceda(cfg, abcd)
+    else:
+            main_abeceda(cfg, cfg.abeceda - 1)
+        
