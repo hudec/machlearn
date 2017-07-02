@@ -70,15 +70,16 @@ def jmeno_souboru(cfg, typ):
     zaklad = '-'.join(map(str, ABCD[cfg.abeceda]))
     if typ == SOUBOR_POSLOUPNOST and cfg.soubor_posloupnosti:
         return zaklad + '.' + cfg.soubor_posloupnosti
-    if typ == SOUBOR_VYSLEDKY and cfg.default_soubor_vysledky:
-        return zaklad + '.' + cfg.default_soubor_vysledky
-    if typ == SOUBOR_NEZPRACOVANE and cfg.default_soubor_vysledky:
-        return zaklad + '.' + cfg.default_soubor_vysledky
+    if typ == SOUBOR_VYSLEDKY and cfg.soubor_vysledky:
+        return zaklad + '.' + cfg.soubor_vysledky
+    if typ == SOUBOR_NEZPRACOVANE and cfg.soubor_vysledky:
+        return zaklad + '.' + cfg.soubor_vysledky
     return None
 
 def nacti_soubor(cfg, typ):
     jmeno = jmeno_souboru(cfg, typ)
     if jmeno and os.path.exists(jmeno):
+        print('nacitam', jmeno)
         with open(jmeno, 'rb') as soubor:
             return pickle.load(soubor)
     return None
@@ -86,6 +87,7 @@ def nacti_soubor(cfg, typ):
 def zapis_soubor(cfg, typ, data):
     jmeno = jmeno_souboru(cfg, typ)
     if jmeno:
+        print('zapisuji', jmeno)
         with open(jmeno, 'wb') as soubor:
             pickle.dump(data, soubor, protocol=4)
 
